@@ -2,23 +2,18 @@ import utils
 import argparser
 import os
 from utils.logger import Logger
-
 from apex.parallel import DistributedDataParallel
 from apex import amp
 from torch.utils.data.distributed import DistributedSampler
-
 import numpy as np
 import random
 import torch
 from torch.utils import data
 from torch import distributed
-
 from dataset import VOCSegmentationIncremental, AdeSegmentationIncremental
 from dataset import transform
 from metrics import StreamSegMetrics
-
 from segmentation_module import make_model
-
 from train import Trainer
 import tasks
 
@@ -59,6 +54,7 @@ def get_dataset(opts):
     else:
         # no crop, batch size = 1
         val_transform = transform.Compose([
+            transform.PadCenterCrop(size=512),
             transform.ToTensor(),
             transform.Normalize(mean=[0.485, 0.456, 0.406],
                                 std=[0.229, 0.224, 0.225]),
@@ -103,27 +99,30 @@ def get_dataset(opts):
     return train_dst, val_dst, test_dst, len(labels_cum)
 
 
+
+def set_seeds(seed):
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+
+
 def main(opts):
-    distributed.init_process_group(backend='nccl', init_method='env://')
-    device_id, device = opts.local_rank, torch.device(opts.local_rank)
-    rank, world_size = distributed.get_rank(), distributed.get_world_size()
-    torch.cuda.set_device(device_id)
+    # distributed.init_process_group(backend='nccl', init_method='env://')
+    # device_id, device = opts.local_rank, torch.device(opts.local_rank)
+    # rank, world_size = distributed.get_rank(), distributed.get_world_size()
+    # torch.cuda.set_device(device_id)
 
     # Initialize logging
+    rank = 0
     task_name = f"{opts.task}-{opts.dataset}"
     logdir_full = f"{opts.logdir}/{task_name}/{opts.name}/"
-    if rank == 0:
-        logger = Logger(logdir_full, rank=rank, debug=opts.debug, summary=opts.visualize, step=opts.step)
-    else:
-        logger = Logger(logdir_full, rank=rank, debug=opts.debug, summary=False)
-
+    logger = Logger(logdir_full, rank=rank, debug=opts.debug, summary=opts.visualize, step=opts.step)
+    device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     logger.print(f"Device: {device}")
 
     # Set up random seed
-    torch.manual_seed(opts.random_seed)
-    torch.cuda.manual_seed(opts.random_seed)
-    np.random.seed(opts.random_seed)
-    random.seed(opts.random_seed)
+    set_seeds(opts.random_seed)
 
     # xxx Set up dataloader
     train_dst, val_dst, test_dst, n_classes = get_dataset(opts)
@@ -131,20 +130,18 @@ def main(opts):
     random.seed(opts.random_seed)
 
     train_loader = data.DataLoader(train_dst, batch_size=opts.batch_size,
-                                   sampler=DistributedSampler(train_dst, num_replicas=world_size, rank=rank),
                                    num_workers=opts.num_workers, drop_last=True)
     val_loader = data.DataLoader(val_dst, batch_size=opts.batch_size if opts.crop_val else 1,
-                                 sampler=DistributedSampler(val_dst, num_replicas=world_size, rank=rank),
                                  num_workers=opts.num_workers)
     logger.info(f"Dataset: {opts.dataset}, Train set: {len(train_dst)}, Val set: {len(val_dst)},"
                 f" Test set: {len(test_dst)}, n_classes {n_classes}")
-    logger.info(f"Total batch size is {opts.batch_size * world_size}")
+    # logger.info(f"Total batch size is {opts.batch_size * world_size}")
 
     # xxx Set up model
-    logger.info(f"Backbone: {opts.backbone}")
+    # logger.info(f"Backbone: {opts.backbone}")
 
     step_checkpoint = None
-    model = make_model(opts, classes=tasks.get_per_task_classes(opts.dataset, opts.task, opts.step))
+    model = make_model( classes=tasks.get_per_task_classes(opts.dataset, opts.task, opts.step))
     logger.info(f"[!] Model made with{'out' if opts.no_pretrained else ''} pre-trained")
 
     if opts.step == 0:  # if step 0, we don't need to instance the model_old
@@ -159,14 +156,18 @@ def main(opts):
 
     # xxx Set up optimizer
     params = []
-    if not opts.freeze:
-        params.append({"params": filter(lambda p: p.requires_grad, model.body.parameters()),
-                       'weight_decay': opts.weight_decay})
+    # if not opts.freeze:
+    #     params.append({"params": filter(lambda p: p.requires_grad, model.body.parameters()),
+    #                    'weight_decay': opts.weight_decay})
 
-    params.append({"params": filter(lambda p: p.requires_grad, model.head.parameters()),
+    params.append({"params": filter(lambda p: p.requires_grad, model.core.parameters()),
                    'weight_decay': opts.weight_decay})
 
     params.append({"params": filter(lambda p: p.requires_grad, model.cls.parameters()),
+                   'weight_decay': opts.weight_decay})
+    params.append({"params": filter(lambda p: p.requires_grad, model.sv1.parameters()),
+                   'weight_decay': opts.weight_decay})
+    params.append({"params": filter(lambda p: p.requires_grad, model.sv2.parameters()),
                    'weight_decay': opts.weight_decay})
 
     optimizer = torch.optim.SGD(params, lr=opts.lr, momentum=0.9, nesterov=True)
@@ -179,15 +180,16 @@ def main(opts):
         raise NotImplementedError
     logger.debug("Optimizer:\n%s" % optimizer)
 
-    if model_old is not None:
-        [model, model_old], optimizer = amp.initialize([model.to(device), model_old.to(device)], optimizer,
-                                                       opt_level=opts.opt_level)
-        model_old = DistributedDataParallel(model_old)
-    else:
-        model, optimizer = amp.initialize(model.to(device), optimizer, opt_level=opts.opt_level)
+    # if model_old is not None:
+    #     [model, model_old], optimizer = amp.initialize([model.to(device), model_old.to(device)], optimizer,
+    #                                                    opt_level=opts.opt_level)
+    #     model_old = DistributedDataParallel(model_old)
+    # else:
+    #     model, optimizer = amp.initialize(model.to(device), optimizer, opt_level=opts.opt_level)
 
     # Put the model on GPU
-    model = DistributedDataParallel(model, delay_allreduce=True)
+    model = model.cuda(device)
+    # model = DistributedDataParallel(model, delay_allreduce=True)
 
     # xxx Load old model from old weights if step > 0!
     if opts.step > 0:
