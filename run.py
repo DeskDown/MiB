@@ -1,6 +1,8 @@
+import sys
+import os
+sys.path.append(os.getcwd())
 import utils
 import argparser
-import os
 from utils.logger import Logger
 from apex.parallel import DistributedDataParallel
 from apex import amp
@@ -113,6 +115,7 @@ def main(opts):
     # rank, world_size = distributed.get_rank(), distributed.get_world_size()
     # torch.cuda.set_device(device_id)
 
+    #--------------#-------------#    
     # Initialize logging
     rank = 0
     task_name = f"{opts.task}-{opts.dataset}"
@@ -121,9 +124,11 @@ def main(opts):
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     logger.print(f"Device: {device}")
 
+    #--------------#-------------#    
     # Set up random seed
     set_seeds(opts.random_seed)
 
+    #--------------#-------------#    
     # xxx Set up dataloader
     train_dst, val_dst, test_dst, n_classes = get_dataset(opts)
     # reset the seed, this revert changes in random seed
@@ -131,15 +136,15 @@ def main(opts):
 
     train_loader = data.DataLoader(train_dst, batch_size=opts.batch_size,
                                    num_workers=opts.num_workers, drop_last=True)
-    val_loader = data.DataLoader(val_dst, batch_size=opts.batch_size if opts.crop_val else 1,
+    val_loader = data.DataLoader(val_dst, batch_size=opts.batch_size if opts.crop_val else 1, # WHY
                                  num_workers=opts.num_workers)
     logger.info(f"Dataset: {opts.dataset}, Train set: {len(train_dst)}, Val set: {len(val_dst)},"
                 f" Test set: {len(test_dst)}, n_classes {n_classes}")
     # logger.info(f"Total batch size is {opts.batch_size * world_size}")
-
-    # xxx Set up model
     # logger.info(f"Backbone: {opts.backbone}")
 
+    #--------------#-------------#    
+    # xxx Set up model
     step_checkpoint = None
     model = make_model( classes=tasks.get_per_task_classes(opts.dataset, opts.task, opts.step))
     logger.info(f"[!] Model made with{'out' if opts.no_pretrained else ''} pre-trained")
@@ -154,22 +159,22 @@ def main(opts):
 
     logger.debug(model)
 
+    #--------------#-------------#    
     # xxx Set up optimizer
     params = []
     # if not opts.freeze:
     #     params.append({"params": filter(lambda p: p.requires_grad, model.body.parameters()),
     #                    'weight_decay': opts.weight_decay})
 
-    params.append({"params": filter(lambda p: p.requires_grad, model.core.parameters()),
-                   'weight_decay': opts.weight_decay})
-
-    params.append({"params": filter(lambda p: p.requires_grad, model.cls.parameters()),
-                   'weight_decay': opts.weight_decay})
-    params.append({"params": filter(lambda p: p.requires_grad, model.sv1.parameters()),
-                   'weight_decay': opts.weight_decay})
-    params.append({"params": filter(lambda p: p.requires_grad, model.sv2.parameters()),
-                   'weight_decay': opts.weight_decay})
-
+    # params.append({"params": filter(lambda p: p.requires_grad, model.core.parameters()),
+    #                'weight_decay': opts.weight_decay})
+    # params.append({"params": filter(lambda p: p.requires_grad, model.cls.parameters()),
+    #                'weight_decay': opts.weight_decay})
+    # params.append({"params": filter(lambda p: p.requires_grad, model.sv1.parameters()),
+    #                'weight_decay': opts.weight_decay})
+    # params.append({"params": filter(lambda p: p.requires_grad, model.sv2.parameters()),
+    #                'weight_decay': opts.weight_decay})
+    params = model.parameters()
     optimizer = torch.optim.SGD(params, lr=opts.lr, momentum=0.9, nesterov=True)
 
     if opts.lr_policy == 'poly':
@@ -187,10 +192,13 @@ def main(opts):
     # else:
     #     model, optimizer = amp.initialize(model.to(device), optimizer, opt_level=opts.opt_level)
 
+
+    #--------------#-------------#    
     # Put the model on GPU
     model = model.cuda(device)
     # model = DistributedDataParallel(model, delay_allreduce=True)
 
+    #--------------#-------------#
     # xxx Load old model from old weights if step > 0!
     if opts.step > 0:
         # get model path
@@ -216,10 +224,12 @@ def main(opts):
         else:
             raise FileNotFoundError(path)
         # put the old model into distributed memory and freeze it
+        model_old = model_old.cuda(device)
         for par in model_old.parameters():
             par.requires_grad = False
         model_old.eval()
 
+    #--------------#-------------#    
     # xxx Set up Trainer
     trainer_state = None
     # if not first step, then instance trainer from step_checkpoint
@@ -250,6 +260,7 @@ def main(opts):
         if opts.step == 0:
             logger.info("[!] Train from scratch")
 
+    #--------------#-------------#    
     # xxx Train procedure
     # print opts before starting training to log all parameters
     logger.add_table("Opts", vars(opts))
@@ -339,20 +350,21 @@ def main(opts):
                   model, trainer, optimizer, scheduler, cur_epoch, best_score)
         logger.info("[!] Checkpoint saved.")
 
-    torch.distributed.barrier()
+    # torch.distributed.barrier()
 
     # xxx From here starts the test code
     logger.info("*** Test the model on all seen classes...")
     # make data loader
     test_loader = data.DataLoader(test_dst, batch_size=opts.batch_size if opts.crop_val else 1,
-                                  sampler=DistributedSampler(test_dst, num_replicas=world_size, rank=rank),
+                                #   sampler=DistributedSampler(test_dst, num_replicas=world_size, rank=rank),
                                   num_workers=opts.num_workers)
 
     # load best model
     if TRAIN:
         model = make_model(opts, classes=tasks.get_per_task_classes(opts.dataset, opts.task, opts.step))
         # Put the model on GPU
-        model = DistributedDataParallel(model.cuda(device))
+        # model = DistributedDataParallel(model.cuda(device))
+        model = model.cuda(device)
         ckpt = f"checkpoints/step/{task_name}_{opts.name}_{opts.step}.pth"
         checkpoint = torch.load(ckpt, map_location="cpu")
         model.load_state_dict(checkpoint["model_state"])
