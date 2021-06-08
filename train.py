@@ -93,17 +93,24 @@ class Trainer:
 
             if (self.lde_flag or self.lkd_flag or self.icarl_dist_flag) and self.model_old is not None:
                 with torch.no_grad():
-                    outputs_old, features_old = self.model_old(images, ret_intermediate=self.ret_intermediate)
+                    outputs_old = self.model_old(images)
+                    features_old = self.model_old.features
 
             optim.zero_grad()
-            outputs, features = model(images, ret_intermediate=self.ret_intermediate)
-
+            outputs, out_sv1, out_sv2 = model(images, ret_intermediate=self.ret_intermediate)
+            features = model.features
             # xxx BCE / Cross Entropy Loss
             if not self.icarl_only_dist:
                 loss = criterion(outputs, labels)  # B x H x W
+                loss_sv1 = criterion(out_sv1, labels)
+                loss_sv2 = criterion(out_sv2, labels)
             else:
                 loss = self.licarl(outputs, labels, torch.sigmoid(outputs_old))
+                loss_sv1 = self.licarl(out_sv1, labels, torch.sigmoid(outputs_old))
+                loss_sv2 = self.licarl(out_sv2, labels, torch.sigmoid(outputs_old))
 
+
+            loss = loss + loss_sv1 + loss_sv2
             loss = loss.mean()  # scalar
 
             if self.icarl_combined:
@@ -115,7 +122,8 @@ class Trainer:
 
             # xxx ILTSS (distillation on features or logits)
             if self.lde_flag:
-                lde = self.lde * self.lde_loss(features['body'], features_old['body'])
+                # lde = self.lde * self.lde_loss(features['body'], features_old['body'])
+                lde = self.lde * self.lde_loss(features, features_old)
 
             if self.lkd_flag:
                 # resize new output to remove new logits and keep only the old ones
@@ -127,7 +135,7 @@ class Trainer:
             with amp.scale_loss(loss_tot, optim) as scaled_loss:
                 scaled_loss.backward()
 
-            # xxx Regularizer (EWC, RW, PI)
+            # xxx Regularizer (EWC, RW, PI) # What?
             if self.regularizer_flag:
                 if distributed.get_rank() == 0:
                     self.regularizer.update()
@@ -196,16 +204,22 @@ class Trainer:
 
                 if (self.lde_flag or self.lkd_flag or self.icarl_dist_flag) and self.model_old is not None:
                     with torch.no_grad():
-                        outputs_old, features_old = self.model_old(images, ret_intermediate=True)
+                        outputs_old = self.model_old(images)
+                        features_old = self.model_old.features
 
-                outputs, features = model(images, ret_intermediate=True)
-
+                outputs = model(images)
+                features = model.features
                 # xxx BCE / Cross Entropy Loss
                 if not self.icarl_only_dist:
                     loss = criterion(outputs, labels)  # B x H x W
+                    loss_sv1 = criterion(out_sv1, labels)
+                    loss_sv2 = criterion(out_sv2, labels)
                 else:
                     loss = self.licarl(outputs, labels, torch.sigmoid(outputs_old))
+                    loss_sv1 = self.licarl(out_sv1, labels, torch.sigmoid(outputs_old))
+                    loss_sv2 = self.licarl(out_sv2, labels, torch.sigmoid(outputs_old))
 
+                loss = loss + loss_sv1 + loss_sv2
                 loss = loss.mean()  # scalar
 
                 if self.icarl_combined:
@@ -217,12 +231,12 @@ class Trainer:
 
                 # xxx ILTSS (distillation on features or logits)
                 if self.lde_flag:
-                    lde = self.lde_loss(features['body'], features_old['body'])
+                    lde = self.lde_loss(features, features_old)
 
                 if self.lkd_flag:
                     lkd = self.lkd_loss(outputs, outputs_old)
 
-                # xxx Regularizer (EWC, RW, PI)
+                # xxx Regularizer (EWC, RW, PI) # WHAT?
                 if self.regularizer_flag:
                     l_reg = self.regularizer.penalty()
 
@@ -241,7 +255,7 @@ class Trainer:
                                         labels[0],
                                         prediction[0]))
 
-            # collect statistics from multiple processes
+            # collect statistics from multiple processes #Why
             metrics.synch(device)
             score = metrics.get_results()
 
