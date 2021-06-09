@@ -1,11 +1,12 @@
 import sys
 import os
-sys.path.append(os.getcwd())
-warnings.filterwarnings(action="ignore")
-import warnings
-from bisenet.build_contextpath import build_contextpath
-from torch import nn
+# import warnings
+# sys.path.append(os.getcwd())
+# warnings.filterwarnings(action="ignore")
+
 import torch
+from torch import nn
+from bisenet.build_contextpath import build_contextpath
 
 
 class ConvBlock(torch.nn.Module):
@@ -112,7 +113,7 @@ class BiSeNet(torch.nn.Module):
         super().__init__()
         # build spatial path
         self.saptial_path = Spatial_path()
-        num_classes = 999 # it has no effect in incremental setup
+        num_classes = 999  # it has no effect in incremental setup
         # build context path
         self.context_path = build_contextpath(name=context_path)
 
