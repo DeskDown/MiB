@@ -157,7 +157,7 @@ class Trainer:
                     self.scaler.scale(l_reg).backward()
 
             # optim.step()
-            self.scaler.step(opt)
+            self.scaler.step(optim)
             self.scaler.update()
             if scheduler is not None:
                 scheduler.step()

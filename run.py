@@ -1,24 +1,26 @@
+import warnings
+import tasks
+from train import Trainer
+from segmentation_module import make_model
+from metrics import StreamSegMetrics
+from dataset import transform
+from dataset import VOCSegmentationIncremental, AdeSegmentationIncremental
+from torch.utils import data
+import torch
+import random
+import numpy as np
+from torch.utils.data.distributed import DistributedSampler
+from torch.cuda import amp
+from utils.logger import Logger
+import argparser
+import utils
 import sys
 import os
-sys.path.append(os.getcwd())
-import utils
-import argparser
-from utils.logger import Logger
+# sys.path.append(os.getcwd())
 # from apex.parallel import DistributedDataParallel
 # from apex import amp
-from torch.cuda import amp
-from torch.utils.data.distributed import DistributedSampler
-import numpy as np
-import random
-import torch
-from torch.utils import data
 # from torch import distributed
-from dataset import VOCSegmentationIncremental, AdeSegmentationIncremental
-from dataset import transform
-from metrics import StreamSegMetrics
-from segmentation_module import make_model
-from train import Trainer
-import tasks
+warnings.filterwarnings(action="ignore")
 
 
 def save_ckpt(path, model, trainer, optimizer, scheduler, epoch, best_score):
@@ -63,7 +65,8 @@ def get_dataset(opts):
                                 std=[0.229, 0.224, 0.225]),
         ])
 
-    labels, labels_old, path_base = tasks.get_task_labels(opts.dataset, opts.task, opts.step)
+    labels, labels_old, path_base = tasks.get_task_labels(
+        opts.dataset, opts.task, opts.step)
     labels_cum = labels_old + labels
 
     if opts.dataset == 'voc':
@@ -87,7 +90,8 @@ def get_dataset(opts):
     if not opts.no_cross_val:  # if opts.cross_val:
         train_len = int(0.8 * len(train_dst))
         val_len = len(train_dst)-train_len
-        train_dst, val_dst = torch.utils.data.random_split(train_dst, [train_len, val_len])
+        train_dst, val_dst = torch.utils.data.random_split(
+            train_dst, [train_len, val_len])
     else:  # don't use cross_val
         val_dst = dataset(root=opts.data_root, train=False, transform=val_transform,
                           labels=list(labels), labels_old=list(labels_old),
@@ -100,7 +104,6 @@ def get_dataset(opts):
                        idxs_path=path_base + f"/test_on_{image_set}-{opts.step}.npy")
 
     return train_dst, val_dst, test_dst, len(labels_cum)
-
 
 
 def set_seeds(seed):
@@ -116,20 +119,22 @@ def main(opts):
     # rank, world_size = distributed.get_rank(), distributed.get_world_size()
     # torch.cuda.set_device(device_id)
 
-    #--------------#-------------#    
+    #--------------#-------------#
     # Initialize logging
     rank = 0
     task_name = f"{opts.task}-{opts.dataset}"
     logdir_full = f"{opts.logdir}/{task_name}/{opts.name}/"
-    logger = Logger(logdir_full, rank=rank, debug=opts.debug, summary=opts.visualize, step=opts.step)
-    device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+    logger = Logger(logdir_full, rank=rank, debug=opts.debug,
+                    summary=opts.visualize, step=opts.step)
+    device = torch.device(
+        'cuda') if torch.cuda.is_available() else torch.device('cpu')
     logger.print(f"Device: {device}")
 
-    #--------------#-------------#    
+    #--------------#-------------#
     # Set up random seed
     set_seeds(opts.random_seed)
 
-    #--------------#-------------#    
+    #--------------#-------------#
     # xxx Set up dataloader
     train_dst, val_dst, test_dst, n_classes = get_dataset(opts)
     # reset the seed, this revert changes in random seed
@@ -137,30 +142,33 @@ def main(opts):
 
     train_loader = data.DataLoader(train_dst, batch_size=opts.batch_size,
                                    num_workers=opts.num_workers, drop_last=True)
-    val_loader = data.DataLoader(val_dst, batch_size=opts.batch_size if opts.crop_val else 1, # WHY
+    val_loader = data.DataLoader(val_dst, batch_size=opts.batch_size if opts.crop_val else 1,  # WHY
                                  num_workers=opts.num_workers)
     logger.info(f"Dataset: {opts.dataset}, Train set: {len(train_dst)}, Val set: {len(val_dst)},"
                 f" Test set: {len(test_dst)}, n_classes {n_classes}")
     # logger.info(f"Total batch size is {opts.batch_size * world_size}")
     # logger.info(f"Backbone: {opts.backbone}")
 
-    #--------------#-------------#    
+    #--------------#-------------#
     # xxx Set up model
     step_checkpoint = None
-    model = make_model( classes=tasks.get_per_task_classes(opts.dataset, opts.task, opts.step))
-    logger.info(f"[!] Model made with{'out' if opts.no_pretrained else ''} pre-trained")
+    model = make_model(classes=tasks.get_per_task_classes(
+        opts.dataset, opts.task, opts.step))
+    logger.info(
+        f"[!] Model made with{'out' if opts.no_pretrained else ''} pre-trained")
 
     if opts.step == 0:  # if step 0, we don't need to instance the model_old
         model_old = None
     else:  # instance model_old
-        model_old = make_model(opts, classes=tasks.get_per_task_classes(opts.dataset, opts.task, opts.step - 1))
+        model_old = make_model(opts, classes=tasks.get_per_task_classes(
+            opts.dataset, opts.task, opts.step - 1))
 
     if opts.fix_bn:
         model.fix_bn()
 
     logger.debug(model)
 
-    #--------------#-------------#    
+    #--------------#-------------#
     # xxx Set up optimizer
     params = []
     # if not opts.freeze:
@@ -176,12 +184,15 @@ def main(opts):
     # params.append({"params": filter(lambda p: p.requires_grad, model.sv2.parameters()),
     #                'weight_decay': opts.weight_decay})
     params = model.parameters()
-    optimizer = torch.optim.SGD(params, lr=opts.lr, momentum=0.9, nesterov=True)
+    optimizer = torch.optim.SGD(
+        params, lr=opts.lr, momentum=0.9, nesterov=True)
 
     if opts.lr_policy == 'poly':
-        scheduler = utils.PolyLR(optimizer, max_iters=opts.epochs * len(train_loader), power=opts.lr_power)
+        scheduler = utils.PolyLR(
+            optimizer, max_iters=opts.epochs * len(train_loader), power=opts.lr_power)
     elif opts.lr_policy == 'step':
-        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=opts.lr_decay_step, gamma=opts.lr_decay_factor)
+        scheduler = torch.optim.lr_scheduler.StepLR(
+            optimizer, step_size=opts.lr_decay_step, gamma=opts.lr_decay_factor)
     else:
         raise NotImplementedError
     logger.debug("Optimizer:\n%s" % optimizer)
@@ -193,8 +204,7 @@ def main(opts):
     # else:
     #     model, optimizer = amp.initialize(model.to(device), optimizer, opt_level=opts.opt_level)
 
-
-    #--------------#-------------#    
+    #--------------#-------------#
     # Put the model on GPU
     model = model.cuda(device)
     # model = DistributedDataParallel(model, delay_allreduce=True)
@@ -211,17 +221,21 @@ def main(opts):
         # generate model from path
         if os.path.exists(path):
             step_checkpoint = torch.load(path, map_location="cpu")
-            model.load_state_dict(step_checkpoint['model_state'], strict=False)  # False because of incr. classifiers
+            # False because of incr. classifiers
+            model.load_state_dict(step_checkpoint['model_state'], strict=False)
             if opts.init_balanced:
                 # implement the balanced initialization (new cls has weight of background and bias = bias_bkg - log(N+1)
                 model.module.init_new_classifier(device)
             # Load state dict from the model state dict, that contains the old model parameters
-            model_old.load_state_dict(step_checkpoint['model_state'], strict=True)  # Load also here old parameters
+            # Load also here old parameters
+            model_old.load_state_dict(
+                step_checkpoint['model_state'], strict=True)
             logger.info(f"[!] Previous model loaded from {path}")
             # clean memory
             del step_checkpoint['model_state']
         elif opts.debug:
-            logger.info(f"[!] WARNING: Unable to find of step {opts.step - 1}! Do you really want to do from scratch?")
+            logger.info(
+                f"[!] WARNING: Unable to find of step {opts.step - 1}! Do you really want to do from scratch?")
         else:
             raise FileNotFoundError(path)
         # put the old model into distributed memory and freeze it
@@ -230,7 +244,7 @@ def main(opts):
             par.requires_grad = False
         model_old.eval()
 
-    #--------------#-------------#    
+    #--------------#-------------#
     # xxx Set up Trainer
     trainer_state = None
     # if not first step, then instance trainer from step_checkpoint
@@ -261,18 +275,21 @@ def main(opts):
         if opts.step == 0:
             logger.info("[!] Train from scratch")
 
-    #--------------#-------------#    
+    #--------------#-------------#
     # xxx Train procedure
     # print opts before starting training to log all parameters
     logger.add_table("Opts", vars(opts))
 
     if rank == 0 and opts.sample_num > 0:
-        sample_ids = np.random.choice(len(val_loader), opts.sample_num, replace=False)  # sample idxs for visualization
+        # sample idxs for visualization
+        sample_ids = np.random.choice(
+            len(val_loader), opts.sample_num, replace=False)
         logger.info(f"The samples id are {sample_ids}")
     else:
         sample_ids = None
 
-    label2color = utils.Label2Color(cmap=utils.color_map(opts.dataset))  # convert labels to images
+    label2color = utils.Label2Color(cmap=utils.color_map(
+        opts.dataset))  # convert labels to images
     denorm = utils.Denormalize(mean=[0.485, 0.456, 0.406],
                                std=[0.229, 0.224, 0.225])  # de-normalization for original images
 
@@ -281,7 +298,7 @@ def main(opts):
     results = {}
 
     # check if random is equal here.
-    logger.print(torch.randint(0,100, (1,1)))
+    logger.print(torch.randint(0, 100, (1, 1)))
     # train/val here
     while cur_epoch < opts.epochs and TRAIN:
         # =====  Train  =====
@@ -324,9 +341,11 @@ def main(opts):
             logger.add_scalar("V-Loss", val_loss[0]+val_loss[1], cur_epoch)
             logger.add_scalar("V-Loss-reg", val_loss[1], cur_epoch)
             logger.add_scalar("V-Loss-cls", val_loss[0], cur_epoch)
-            logger.add_scalar("Val_Overall_Acc", val_score['Overall Acc'], cur_epoch)
+            logger.add_scalar("Val_Overall_Acc",
+                              val_score['Overall Acc'], cur_epoch)
             logger.add_scalar("Val_MeanIoU", val_score['Mean IoU'], cur_epoch)
-            logger.add_table("Val_Class_IoU", val_score['Class IoU'], cur_epoch)
+            logger.add_table(
+                "Val_Class_IoU", val_score['Class IoU'], cur_epoch)
             logger.add_table("Val_Acc_IoU", val_score['Class Acc'], cur_epoch)
             # logger.add_figure("Val_Confusion_Matrix", val_score['Confusion Matrix'], cur_epoch)
 
@@ -336,10 +355,12 @@ def main(opts):
 
             for k, (img, target, lbl) in enumerate(ret_samples):
                 img = (denorm(img) * 255).astype(np.uint8)
-                target = label2color(target).transpose(2, 0, 1).astype(np.uint8)
+                target = label2color(target).transpose(
+                    2, 0, 1).astype(np.uint8)
                 lbl = label2color(lbl).transpose(2, 0, 1).astype(np.uint8)
 
-                concat_img = np.concatenate((img, target, lbl), axis=2)  # concat along width
+                concat_img = np.concatenate(
+                    (img, target, lbl), axis=2)  # concat along width
                 logger.add_image(f'Sample_{k}', concat_img, cur_epoch)
 
         cur_epoch += 1
@@ -357,12 +378,13 @@ def main(opts):
     logger.info("*** Test the model on all seen classes...")
     # make data loader
     test_loader = data.DataLoader(test_dst, batch_size=opts.batch_size if opts.crop_val else 1,
-                                #   sampler=DistributedSampler(test_dst, num_replicas=world_size, rank=rank),
+                                  #   sampler=DistributedSampler(test_dst, num_replicas=world_size, rank=rank),
                                   num_workers=opts.num_workers)
 
     # load best model
     if TRAIN:
-        model = make_model(opts, classes=tasks.get_per_task_classes(opts.dataset, opts.task, opts.step))
+        model = make_model(opts, classes=tasks.get_per_task_classes(
+            opts.dataset, opts.task, opts.step))
         # Put the model on GPU
         # model = DistributedDataParallel(model.cuda(device))
         model = model.cuda(device)
@@ -375,7 +397,8 @@ def main(opts):
 
     model.eval()
 
-    val_loss, val_score, _ = trainer.validate(loader=test_loader, metrics=val_metrics, logger=logger)
+    val_loss, val_score, _ = trainer.validate(
+        loader=test_loader, metrics=val_metrics, logger=logger)
     logger.print("Done test")
     logger.info(f"*** End of Test, Total Loss={val_loss[0]+val_loss[1]},"
                 f" Class Loss={val_loss[0]}, Reg Loss={val_loss[1]}")
