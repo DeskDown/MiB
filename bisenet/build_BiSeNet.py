@@ -1,11 +1,11 @@
-import warnings
-from model.build_contextpath import build_contextpath
-from torch import nn
-import torch
 import sys
 import os
 sys.path.append(os.getcwd())
 warnings.filterwarnings(action="ignore")
+import warnings
+from bisenet.build_contextpath import build_contextpath
+from torch import nn
+import torch
 
 
 class ConvBlock(torch.nn.Module):
