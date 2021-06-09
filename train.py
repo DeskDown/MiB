@@ -1,7 +1,8 @@
 import torch
-from torch import distributed
+# from torch import distributed
 import torch.nn as nn
-from apex import amp
+# from apex import amp
+from torch.cuda import amp
 from functools import reduce
 
 from utils.loss import KnowledgeDistillationLoss, BCEWithLogitsLossWithIgnoreIndex, \
@@ -15,6 +16,7 @@ class Trainer:
         self.model_old = model_old
         self.model = model
         self.device = device
+        self.scaler = amp.GradScaler()
 
         if classes is not None:
             new_classes = classes[-1]
@@ -28,11 +30,14 @@ class Trainer:
 
         self.bce = opts.bce or opts.icarl
         if self.bce:
-            self.criterion = BCEWithLogitsLossWithIgnoreIndex(reduction=reduction)
+            self.criterion = BCEWithLogitsLossWithIgnoreIndex(
+                reduction=reduction)
         elif opts.unce and self.old_classes != 0:
-            self.criterion = UnbiasedCrossEntropy(old_cl=self.old_classes, ignore_index=255, reduction=reduction)
+            self.criterion = UnbiasedCrossEntropy(
+                old_cl=self.old_classes, ignore_index=255, reduction=reduction)
         else:
-            self.criterion = nn.CrossEntropyLoss(ignore_index=255, reduction=reduction)
+            self.criterion = nn.CrossEntropyLoss(
+                ignore_index=255, reduction=reduction)
 
         # ILTSS
         self.lde = opts.loss_de
@@ -61,7 +66,8 @@ class Trainer:
 
         # Regularization
         regularizer_state = trainer_state['regularizer'] if trainer_state is not None else None
-        self.regularizer = get_regularizer(model, model_old, device, opts, regularizer_state)
+        self.regularizer = get_regularizer(
+            model, model_old, device, opts, regularizer_state)
         self.regularizer_flag = self.regularizer is not None
         self.reg_importance = opts.reg_importance
 
@@ -69,7 +75,8 @@ class Trainer:
 
     def train(self, cur_epoch, optim, train_loader, scheduler=None, print_int=10, logger=None):
         """Train and return epoch loss"""
-        logger.info("Epoch %d, lr = %f" % (cur_epoch, optim.param_groups[0]['lr']))
+        logger.info("Epoch %d, lr = %f" %
+                    (cur_epoch, optim.param_groups[0]['lr']))
 
         device = self.device
         model = self.model
@@ -83,35 +90,38 @@ class Trainer:
         l_icarl = torch.tensor(0.)
         l_reg = torch.tensor(0.)
 
-        train_loader.sampler.set_epoch(cur_epoch)
+        # train_loader.sampler.set_epoch(cur_epoch)
 
         model.train()
         for cur_step, (images, labels) in enumerate(train_loader):
 
             images = images.to(device, dtype=torch.float32)
             labels = labels.to(device, dtype=torch.long)
+            with amp.autocast():
+                if (self.lde_flag or self.lkd_flag or self.icarl_dist_flag) and self.model_old is not None:
+                    with torch.no_grad():
+                        outputs_old = self.model_old(images)
+                        features_old = self.model_old.features
 
-            if (self.lde_flag or self.lkd_flag or self.icarl_dist_flag) and self.model_old is not None:
-                with torch.no_grad():
-                    outputs_old = self.model_old(images)
-                    features_old = self.model_old.features
+                optim.zero_grad()
+                outputs, out_sv1, out_sv2 = model(
+                    images, ret_intermediate=self.ret_intermediate)
+                features = model.features
+                # xxx BCE / Cross Entropy Loss
+                if not self.icarl_only_dist:
+                    loss = criterion(outputs, labels)  # B x H x W
+                    loss_sv1 = criterion(out_sv1, labels)
+                    loss_sv2 = criterion(out_sv2, labels)
+                else:
+                    loss = self.licarl(
+                        outputs, labels, torch.sigmoid(outputs_old))
+                    loss_sv1 = self.licarl(
+                        out_sv1, labels, torch.sigmoid(outputs_old))
+                    loss_sv2 = self.licarl(
+                        out_sv2, labels, torch.sigmoid(outputs_old))
 
-            optim.zero_grad()
-            outputs, out_sv1, out_sv2 = model(images, ret_intermediate=self.ret_intermediate)
-            features = model.features
-            # xxx BCE / Cross Entropy Loss
-            if not self.icarl_only_dist:
-                loss = criterion(outputs, labels)  # B x H x W
-                loss_sv1 = criterion(out_sv1, labels)
-                loss_sv2 = criterion(out_sv2, labels)
-            else:
-                loss = self.licarl(outputs, labels, torch.sigmoid(outputs_old))
-                loss_sv1 = self.licarl(out_sv1, labels, torch.sigmoid(outputs_old))
-                loss_sv2 = self.licarl(out_sv2, labels, torch.sigmoid(outputs_old))
-
-
-            loss = loss + loss_sv1 + loss_sv2
-            loss = loss.mean()  # scalar
+                loss = loss + loss_sv1 + loss_sv2
+                loss = loss.mean()  # scalar
 
             if self.icarl_combined:
                 # tensor.narrow( dim, start, end) -> slice tensor from start to end in the specified dim
@@ -131,18 +141,19 @@ class Trainer:
 
             # xxx first backprop of previous loss (compute the gradients for regularization methods)
             loss_tot = loss + lkd + lde + l_icarl
-
-            with amp.scale_loss(loss_tot, optim) as scaled_loss:
-                scaled_loss.backward()
+            self.scaler.scale(loss_tot).backward()
+            # with amp.scale_loss(loss_tot, optim) as scaled_loss:
+            #     scaled_loss.backward()
 
             # xxx Regularizer (EWC, RW, PI) # What?
             if self.regularizer_flag:
-                if distributed.get_rank() == 0:
-                    self.regularizer.update()
+                # if distributed.get_rank() == 0:
+                self.regularizer.update()
                 l_reg = self.reg_importance * self.regularizer.penalty()
                 if l_reg != 0.:
-                    with amp.scale_loss(l_reg, optim) as scaled_loss:
-                        scaled_loss.backward()
+                    # with amp.scale_loss(l_reg, optim) as scaled_loss:
+                    #     scaled_loss.backward()
+                    self.scaler.scale(l_reg).backward()
 
             optim.step()
             if scheduler is not None:
@@ -158,25 +169,27 @@ class Trainer:
                 interval_loss = interval_loss / print_int
                 logger.info(f"Epoch {cur_epoch}, Batch {cur_step + 1}/{len(train_loader)},"
                             f" Loss={interval_loss}")
-                logger.debug(f"Loss made of: CE {loss}, LKD {lkd}, LDE {lde}, LReg {l_reg}")
+                logger.debug(
+                    f"Loss made of: CE {loss}, LKD {lkd}, LDE {lde}, LReg {l_reg}")
                 # visualization
                 if logger is not None:
                     x = cur_epoch * len(train_loader) + cur_step + 1
                     logger.add_scalar('Loss', interval_loss, x)
                 interval_loss = 0.0
 
-        # collect statistics from multiple processes
-        epoch_loss = torch.tensor(epoch_loss).to(self.device)
-        reg_loss = torch.tensor(reg_loss).to(self.device)
+        # # collect statistics from multiple processes
+        # epoch_loss = torch.tensor(epoch_loss).to(self.device)
+        # reg_loss = torch.tensor(reg_loss).to(self.device)
 
-        torch.distributed.reduce(epoch_loss, dst=0)
-        torch.distributed.reduce(reg_loss, dst=0)
+        # torch.distributed.reduce(epoch_loss, dst=0)
+        # torch.distributed.reduce(reg_loss, dst=0)
 
-        if distributed.get_rank() == 0:
-            epoch_loss = epoch_loss / distributed.get_world_size() / len(train_loader)
-            reg_loss = reg_loss / distributed.get_world_size() / len(train_loader)
+        # if distributed.get_rank() == 0:
+        #     epoch_loss = epoch_loss / distributed.get_world_size() / len(train_loader)
+        #     reg_loss = reg_loss / distributed.get_world_size() / len(train_loader)
 
-        logger.info(f"Epoch {cur_epoch}, Class Loss={epoch_loss}, Reg Loss={reg_loss}")
+        logger.info(
+            f"Epoch {cur_epoch}, Class Loss={epoch_loss}, Reg Loss={reg_loss}")
 
         return (epoch_loss, reg_loss)
 
@@ -215,9 +228,12 @@ class Trainer:
                     loss_sv1 = criterion(out_sv1, labels)
                     loss_sv2 = criterion(out_sv2, labels)
                 else:
-                    loss = self.licarl(outputs, labels, torch.sigmoid(outputs_old))
-                    loss_sv1 = self.licarl(out_sv1, labels, torch.sigmoid(outputs_old))
-                    loss_sv2 = self.licarl(out_sv2, labels, torch.sigmoid(outputs_old))
+                    loss = self.licarl(
+                        outputs, labels, torch.sigmoid(outputs_old))
+                    loss_sv1 = self.licarl(
+                        out_sv1, labels, torch.sigmoid(outputs_old))
+                    loss_sv2 = self.licarl(
+                        out_sv2, labels, torch.sigmoid(outputs_old))
 
                 loss = loss + loss_sv1 + loss_sv2
                 loss = loss.mean()  # scalar
@@ -255,27 +271,29 @@ class Trainer:
                                         labels[0],
                                         prediction[0]))
 
-            # collect statistics from multiple processes #Why
-            metrics.synch(device)
-            score = metrics.get_results()
+            # # collect statistics from multiple processes #Why
+            # metrics.synch(device)
+            # score = metrics.get_results()
 
-            class_loss = torch.tensor(class_loss).to(self.device)
-            reg_loss = torch.tensor(reg_loss).to(self.device)
+            # class_loss = torch.tensor(class_loss).to(self.device)
+            # reg_loss = torch.tensor(reg_loss).to(self.device)
 
-            torch.distributed.reduce(class_loss, dst=0)
-            torch.distributed.reduce(reg_loss, dst=0)
+            # torch.distributed.reduce(class_loss, dst=0)
+            # torch.distributed.reduce(reg_loss, dst=0)
 
-            if distributed.get_rank() == 0:
-                class_loss = class_loss / distributed.get_world_size() / len(loader)
-                reg_loss = reg_loss / distributed.get_world_size() / len(loader)
+            # if distributed.get_rank() == 0:
+            #     class_loss = class_loss / distributed.get_world_size() / len(loader)
+            #     reg_loss = reg_loss / distributed.get_world_size() / len(loader)
 
             if logger is not None:
-                logger.info(f"Validation, Class Loss={class_loss}, Reg Loss={reg_loss} (without scaling)")
+                logger.info(
+                    f"Validation, Class Loss={class_loss}, Reg Loss={reg_loss} (without scaling)")
 
         return (class_loss, reg_loss), score, ret_samples
 
     def state_dict(self):
-        state = {"regularizer": self.regularizer.state_dict() if self.regularizer_flag else None}
+        state = {"regularizer": self.regularizer.state_dict()
+                 if self.regularizer_flag else None}
 
         return state
 

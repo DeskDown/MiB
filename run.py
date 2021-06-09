@@ -4,14 +4,15 @@ sys.path.append(os.getcwd())
 import utils
 import argparser
 from utils.logger import Logger
-from apex.parallel import DistributedDataParallel
-from apex import amp
+# from apex.parallel import DistributedDataParallel
+# from apex import amp
+from torch.cuda import amp
 from torch.utils.data.distributed import DistributedSampler
 import numpy as np
 import random
 import torch
 from torch.utils import data
-from torch import distributed
+# from torch import distributed
 from dataset import VOCSegmentationIncremental, AdeSegmentationIncremental
 from dataset import transform
 from metrics import StreamSegMetrics

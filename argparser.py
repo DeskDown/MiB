@@ -1,3 +1,4 @@
+import os
 import argparse
 import tasks
 
@@ -48,13 +49,14 @@ def get_argparser():
 
     # Performance Options
     parser.add_argument("--local_rank", type=int, default=0)
-    parser.add_argument("--random_seed", type=int, default=42,
-                        help="random seed (default: 42)")
-    parser.add_argument("--num_workers", type=int, default=1,
+    parser.add_argument("--random_seed", type=int, default=44,
+                        help="random seed (default: 44)")
+    parser.add_argument("--num_workers", type=int, default=8,
                         help='number of workers (default: 1)')
 
     # Datset Options
-    parser.add_argument("--data_root", type=str, default='data',
+    parser.add_argument("--data_root", type=str, default= "/root_drive/MyDrive/data" 
+        if os.name != 'nt' else r"C:\Users\rehma\Google Drive\data",
                         help="path to Dataset")
     parser.add_argument("--dataset", type=str, default='voc',
                         choices=['voc', 'ade'], help='Name of dataset')
@@ -73,7 +75,7 @@ def get_argparser():
     parser.add_argument("--fix_bn", action='store_true', default=False,
                         help='fix batch normalization during training (default: False)')
 
-    parser.add_argument("--batch_size", type=int, default=4,
+    parser.add_argument("--batch_size", type=int, default=32,
                         help='batch size (default: 4)')
     parser.add_argument("--crop_size", type=int, default=512,
                         help="crop size (default: 513)")
@@ -117,13 +119,13 @@ def get_argparser():
                         help="visualization on tensorboard (def: Yes)")
     parser.add_argument("--print_interval", type=int, default=10,
                         help="print interval of loss (default: 10)")
-    parser.add_argument("--val_interval", type=int, default=1,
+    parser.add_argument("--val_interval", type=int, default=2,
                         help="epoch interval for eval (default: 1)")
     parser.add_argument("--ckpt_interval", type=int, default=1,
                         help="epoch interval for saving model (default: 1)")
 
     # Model Options
-    parser.add_argument("--backbone", type=str, default='resnet101',
+    parser.add_argument("--backbone", type=str, default='resnet50',
                         choices=['resnet50', 'resnet101'], help='backbone for the body (def: resnet50)')
     parser.add_argument("--output_stride", type=int, default=16,
                         choices=[8, 16], help='stride for the backbone (def: 16)')
