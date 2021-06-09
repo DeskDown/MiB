@@ -117,7 +117,7 @@ def get_argparser():
                         help="verbose option")
     parser.add_argument("--visualize",  action='store_false', default=True,
                         help="visualization on tensorboard (def: Yes)")
-    parser.add_argument("--print_interval", type=int, default=10,
+    parser.add_argument("--print_interval", type=int, default=100,
                         help="print interval of loss (default: 10)")
     parser.add_argument("--val_interval", type=int, default=2,
                         help="epoch interval for eval (default: 1)")

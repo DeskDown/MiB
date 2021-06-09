@@ -73,7 +73,7 @@ class Trainer:
 
         self.ret_intermediate = self.lde
 
-    def train(self, cur_epoch, optim, train_loader, scheduler=None, print_int=10, logger=None):
+    def train(self, cur_epoch, optim, train_loader, scheduler=None, print_int=100, logger=None):
         """Train and return epoch loss"""
         logger.info("Epoch %d, lr = %f" %
                     (cur_epoch, optim.param_groups[0]['lr']))
