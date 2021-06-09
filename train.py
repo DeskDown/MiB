@@ -108,18 +108,18 @@ class Trainer:
                 features = model.features
                 # xxx BCE / Cross Entropy Loss
                 if not self.icarl_only_dist:
-                    loss = criterion(outputs, labels)  # B x H x W
+                    final_loss = criterion(outputs, labels)  # B x H x W
                     loss_sv1 = criterion(out_sv1, labels)
                     loss_sv2 = criterion(out_sv2, labels)
                 else:
-                    loss = self.licarl(
+                    final_loss = self.licarl(
                         outputs, labels, torch.sigmoid(outputs_old))
                     loss_sv1 = self.licarl(
                         out_sv1, labels, torch.sigmoid(outputs_old))
                     loss_sv2 = self.licarl(
                         out_sv2, labels, torch.sigmoid(outputs_old))
 
-                loss = loss + loss_sv1 + loss_sv2
+                loss = final_loss + loss_sv1 + loss_sv2
                 loss = loss.mean()  # scalar
 
             if self.icarl_combined:
@@ -160,6 +160,7 @@ class Trainer:
             if scheduler is not None:
                 scheduler.step()
 
+            loss = final_loss.mean()  # To make it compatible with validation and testing loss
             epoch_loss += loss.item()
             reg_loss += l_reg.item() if l_reg != 0. else 0.
             reg_loss += lkd.item() + lde.item() + l_icarl.item()
@@ -188,6 +189,8 @@ class Trainer:
         # if distributed.get_rank() == 0:
         #     epoch_loss = epoch_loss / distributed.get_world_size() / len(train_loader)
         #     reg_loss = reg_loss / distributed.get_world_size() / len(train_loader)
+        epoch_loss = epoch_loss / len(train_loader)
+        reg_loss = reg_loss / len(train_loader)
 
         logger.info(
             f"Epoch {cur_epoch}, Class Loss={epoch_loss}, Reg Loss={reg_loss}")
@@ -225,19 +228,19 @@ class Trainer:
                 features = model.features
                 # xxx BCE / Cross Entropy Loss
                 if not self.icarl_only_dist:
-                    loss = criterion(outputs, labels)  # B x H x W
-                    loss_sv1 = criterion(out_sv1, labels)
-                    loss_sv2 = criterion(out_sv2, labels)
+                    final_loss = criterion(outputs, labels)  # B x H x W
+                    # loss_sv1 = criterion(out_sv1, labels)
+                    # loss_sv2 = criterion(out_sv2, labels)
                 else:
-                    loss = self.licarl(
+                    final_loss = self.licarl(
                         outputs, labels, torch.sigmoid(outputs_old))
-                    loss_sv1 = self.licarl(
-                        out_sv1, labels, torch.sigmoid(outputs_old))
-                    loss_sv2 = self.licarl(
-                        out_sv2, labels, torch.sigmoid(outputs_old))
+                    # loss_sv1 = self.licarl(
+                    #     out_sv1, labels, torch.sigmoid(outputs_old))
+                    # loss_sv2 = self.licarl(
+                    #     out_sv2, labels, torch.sigmoid(outputs_old))
 
-                loss = loss + loss_sv1 + loss_sv2
-                loss = loss.mean()  # scalar
+                # loss = loss + loss_sv1 + loss_sv2
+                loss = final_loss.mean()  # scalar
 
                 if self.icarl_combined:
                     # tensor.narrow( dim, start, end) -> slice tensor from start to end in the specified dim
