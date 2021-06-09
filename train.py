@@ -277,7 +277,7 @@ class Trainer:
 
             # # collect statistics from multiple processes #Why
             # metrics.synch(device)
-            # score = metrics.get_results()
+            score = metrics.get_results()
 
             # class_loss = torch.tensor(class_loss).to(self.device)
             # reg_loss = torch.tensor(reg_loss).to(self.device)
@@ -286,8 +286,8 @@ class Trainer:
             # torch.distributed.reduce(reg_loss, dst=0)
 
             # if distributed.get_rank() == 0:
-            #     class_loss = class_loss / distributed.get_world_size() / len(loader)
-            #     reg_loss = reg_loss / distributed.get_world_size() / len(loader)
+            class_loss = class_loss / len(loader)
+            reg_loss = reg_loss / len(loader)
 
             if logger is not None:
                 logger.info(

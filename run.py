@@ -368,9 +368,9 @@ def main(opts):
     # =====  Save Best Model at the end of training =====
     if rank == 0 and TRAIN:  # save best model at the last iteration
         # best model to build incremental steps
-        save_ckpt(f"checkpoints/step/{task_name}_{opts.name}_{opts.step}.pth",
-                  model, trainer, optimizer, scheduler, cur_epoch, best_score)
-        logger.info("[!] Checkpoint saved.")
+        path = f"checkpoints/step/{task_name}_{opts.name}_{opts.step}.pth"
+        save_ckpt(path, model, trainer, optimizer, scheduler, cur_epoch, best_score)
+        logger.info(f"[!] After training Checkpoint saved @{path}")
 
     # torch.distributed.barrier()
 
