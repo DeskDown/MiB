@@ -307,7 +307,7 @@ def main(opts):
         epoch_loss = trainer.train(cur_epoch=cur_epoch, optim=optimizer,
                                    train_loader=train_loader, scheduler=scheduler, logger=logger)
 
-        logger.info(f"End of Epoch {cur_epoch}/{opts.epochs}, Average Loss={epoch_loss[0]+epoch_loss[1]},"
+        logger.info(f"End of Epoch {cur_epoch}/{opts.epochs}, Average Loss={(epoch_loss[0]+epoch_loss[1])/2},"
                     f" Class Loss={epoch_loss[0]}, Reg Loss={epoch_loss[1]}")
 
         # =====  Log metrics on Tensorboard =====
