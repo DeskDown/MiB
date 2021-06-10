@@ -40,6 +40,7 @@ def modify_command_options(opts):
 
     opts.no_overlap = not opts.overlap
     opts.no_cross_val = not opts.cross_val
+    opts.name = opts.method
 
     return opts
 
@@ -76,7 +77,7 @@ def get_argparser():
                         help='fix batch normalization during training (default: False)')
 
     parser.add_argument("--batch_size", type=int, default=32,
-                        help='batch size (default: 4)')
+                        help='batch size (default: 32)')
     parser.add_argument("--crop_size", type=int, default=320,
                         help="crop size (default: 513)")
 
