@@ -66,7 +66,7 @@ def get_dataset(opts):
         ])
 
     labels, labels_old, path_base = tasks.get_task_labels(
-        opts.dataset, opts.task, opts.step)
+        opts.dataset, name = opts.task, step = opts.step)
     labels_cum = labels_old + labels
 
     if opts.dataset == 'voc':
@@ -75,7 +75,7 @@ def get_dataset(opts):
         dataset = AdeSegmentationIncremental
     else:
         raise NotImplementedError
-
+    # Path base is like f'data/{dataset}/{name}'
     if opts.overlap:
         path_base += "-ov"
 
@@ -84,7 +84,7 @@ def get_dataset(opts):
 
     train_dst = dataset(root=opts.data_root, train=True, transform=train_transform,
                         labels=list(labels), labels_old=list(labels_old),
-                        idxs_path=path_base + f"/train-{opts.step}.npy",
+                        idxs_path= path_base + f"/train-{opts.step}.npy",
                         masking=not opts.no_mask, overlap=opts.overlap)
 
     if not opts.no_cross_val:  # if opts.cross_val:
@@ -225,7 +225,7 @@ def main(opts):
             model.load_state_dict(step_checkpoint['model_state'], strict=False)
             if opts.init_balanced:
                 # implement the balanced initialization (new cls has weight of background and bias = bias_bkg - log(N+1)
-                model.module.init_new_classifier(device)
+                model.init_new_classifier(device)
             # Load state dict from the model state dict, that contains the old model parameters
             # Load also here old parameters
             model_old.load_state_dict(
@@ -369,7 +369,8 @@ def main(opts):
     if rank == 0 and TRAIN:  # save best model at the last iteration
         # best model to build incremental steps
         path = f"checkpoints/step/{task_name}_{opts.name}_{opts.step}.pth"
-        save_ckpt(path, model, trainer, optimizer, scheduler, cur_epoch, best_score)
+        save_ckpt(path, model, trainer, optimizer,
+                  scheduler, cur_epoch, best_score)
         logger.info(f"[!] After training Checkpoint saved @{path}")
 
     # torch.distributed.barrier()
