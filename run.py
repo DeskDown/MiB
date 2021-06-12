@@ -66,7 +66,7 @@ def get_dataset(opts):
         ])
 
     labels, labels_old, path_base = tasks.get_task_labels(
-        opts.dataset, name = opts.task, step = opts.step)
+        opts.dataset, name=opts.task, step=opts.step)
     labels_cum = labels_old + labels
 
     if opts.dataset == 'voc':
@@ -84,7 +84,7 @@ def get_dataset(opts):
 
     train_dst = dataset(root=opts.data_root, train=True, transform=train_transform,
                         labels=list(labels), labels_old=list(labels_old),
-                        idxs_path= path_base + f"/train-{opts.step}.npy",
+                        idxs_path=path_base + f"/train-{opts.step}.npy",
                         masking=not opts.no_mask, overlap=opts.overlap)
 
     if not opts.no_cross_val:  # if opts.cross_val:
@@ -383,7 +383,7 @@ def main(opts):
                                   num_workers=opts.num_workers)
     # choose samples to print
     tot = len(test_loader)
-    sample_ids = np.array([5,tot//4,tot//2,tot//4+tot//2,tot-5])
+    sample_ids = np.array([5, tot//4, tot//2, tot//4+tot//2, tot-5])
     # load best model
     if TRAIN:
         model = make_model(opts, classes=tasks.get_per_task_classes(
@@ -401,7 +401,7 @@ def main(opts):
     model.eval()
 
     val_loss, val_score, ret_samples = trainer.validate(
-        loader=test_loader, metrics=val_metrics,ret_samples_ids = sample_ids, logger=logger)
+        loader=test_loader, metrics=val_metrics, ret_samples_ids=sample_ids, logger=logger)
     logger.print("Done test")
     logger.info(f"*** End of Test, Total Loss={val_loss[0]+val_loss[1]},"
                 f" Class Loss={val_loss[0]}, Reg Loss={val_loss[1]}")
@@ -425,8 +425,8 @@ def main(opts):
 
         concat_img = np.concatenate(
             (img, target, lbl), axis=2)  # concat along width
-        logger.add_image(f'Sample_{k}', concat_img, 0)
-        
+        logger.add_image(f'test_Sample_{k}', concat_img, opts.step)
+
     logger.close()
 
 

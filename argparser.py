@@ -22,7 +22,7 @@ def modify_command_options(opts):
             opts.icarl_importance = 10
         if opts.method == 'ILT':
             opts.loss_kd = 100
-            opts.loss_de = 100
+            opts.loss_de = 10
         if opts.method == 'EWC':
             opts.regularizer = "ewc"
             opts.reg_importance = 500
@@ -199,5 +199,9 @@ def get_argparser():
     parser.add_argument("--step_ckpt", default=None, type=str,
                         help="path to trained model at previous step. Leave it None if you want to use def path")
     parser.add_argument('--opt_level', type=str, choices=['O0', 'O1', 'O2', 'O3'], default='O0')
+    parser.add_argument("--col_examplers", action='store_true', default=False,
+                        help='create examplers for next step (default: True)')
+    parser.add_argument("--use_examplers", action='store_true', default=False,
+                        help='use examplers (default: False)')
 
     return parser
