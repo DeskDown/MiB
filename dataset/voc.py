@@ -110,7 +110,8 @@ class VOCSegmentationIncremental(data.Dataset):
                  labels_old=None,
                  idxs_path=None,
                  masking=True,
-                 overlap=True):
+                 overlap=True,
+                 opts = None):
 
         full_voc = VOCSegmentation(root, 'train' if train else 'val', is_aug=True, transform=None)
 
@@ -135,7 +136,7 @@ class VOCSegmentationIncremental(data.Dataset):
             if idxs_path is not None and os.path.exists(idxs_path):
                 idxs = np.load(idxs_path).tolist()
             else:
-                idxs = filter_images(full_voc, labels, labels_old, overlap=overlap)
+                idxs = filter_images(full_voc, labels, labels_old, overlap=overlap, opts=opts)
                 if idxs_path is not None:# and distributed.get_rank() == 0:
                     np.save(idxs_path, np.array(idxs, dtype=int))
 
