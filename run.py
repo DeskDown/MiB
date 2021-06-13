@@ -96,12 +96,12 @@ def get_dataset(opts):
         val_dst = dataset(root=opts.data_root, train=False, transform=val_transform,
                           labels=list(labels), labels_old=list(labels_old),
                           idxs_path=path_base + f"/val-{opts.step}.npy",
-                          masking=not opts.no_mask, overlap=True)
+                          masking=not opts.no_mask, overlap=True,opts = opts)
 
     image_set = 'train' if opts.val_on_trainset else 'val'
     test_dst = dataset(root=opts.data_root, train=opts.val_on_trainset, transform=val_transform,
                        labels=list(labels_cum),
-                       idxs_path=path_base + f"/test_on_{image_set}-{opts.step}.npy")
+                       idxs_path=path_base + f"/test_on_{image_set}-{opts.step}.npy",opts = opts)
 
     return train_dst, val_dst, test_dst, len(labels_cum)
 

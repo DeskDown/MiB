@@ -18,7 +18,8 @@ def group_images(dataset, labels):
 
 def filter_images(dataset, labels, labels_old=None, overlap=True, opts = None):
     # Filter images without any label in LABELS (using labels not reordered)
-    
+    if opts:
+        print(opts.task)
     # use all the data in offline settings
     if opts is not None and opts.task == 'offline':
         return [i for i in range(len(dataset))]
