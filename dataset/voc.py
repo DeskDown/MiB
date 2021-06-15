@@ -129,10 +129,9 @@ class VOCSegmentationIncremental(data.Dataset):
 
             self.__strip_zero(labels)
             self.__strip_zero(labels_old)
-
-            assert not any(l in labels_old for l in labels) \
-                    and opts.use_examplers,\
-                    "labels and labels_old must be disjoint sets"
+            if opts.use_examplers == False:
+                assert not any(l in labels_old for l in labels),\
+                        "labels and labels_old must be disjoint sets"
 
 
             # examplers setup
