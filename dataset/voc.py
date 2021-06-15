@@ -165,7 +165,7 @@ class VOCSegmentationIncremental(data.Dataset):
                 if new_exemplars_idxs is not None:
                     print("exemplars selected for next steps: {}"
                             .format(len(new_exemplars_idxs)))
-                    np.save(new_exemplars_path, np.array(idxs, dtype=int))
+                    np.save(new_exemplars_path, np.array(new_exemplars_idxs, dtype=int))
 
             self.labels = [0] + labels
             self.labels_old = [0] + labels_old
