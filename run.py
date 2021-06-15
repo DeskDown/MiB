@@ -44,6 +44,7 @@ def get_dataset(opts):
     train_transform = transform.Compose([
         transform.RandomResizedCrop(opts.crop_size, (0.5, 2.0)),
         transform.RandomHorizontalFlip(),
+        transform.RandomRotation(5),
         transform.ToTensor(),
         transform.Normalize(mean=[0.485, 0.456, 0.406],
                             std=[0.229, 0.224, 0.225]),
