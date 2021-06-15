@@ -8,6 +8,7 @@ from dataset import VOCSegmentationIncremental, AdeSegmentationIncremental
 from torch.utils import data
 import torch
 import random
+from tqdm import tqdm
 import numpy as np
 from torch.utils.data.distributed import DistributedSampler
 from torch.cuda import amp
@@ -59,7 +60,6 @@ def get_dataset(opts):
     else:
         # no crop, batch size = 1
         val_transform = transform.Compose([
-            transform.PadCenterCrop(size=512),
             transform.ToTensor(),
             transform.Normalize(mean=[0.485, 0.456, 0.406],
                                 std=[0.229, 0.224, 0.225]),
@@ -103,7 +103,7 @@ def get_dataset(opts):
                        labels=list(labels_cum),
                        idxs_path=path_base + f"/test_on_{image_set}-{opts.step}.npy",opts = opts)
 
-    return train_dst, val_dst, test_dst, len(labels_cum)
+    return (train_dst, val_dst, test_dst, len(labels_cum))
 
 
 def set_seeds(seed):
@@ -206,7 +206,8 @@ def main(opts):
 
     #--------------#-------------#
     # Put the model on GPU
-    model = model.cuda(device)
+    # model = model.cuda(device)
+    model = model.to(device)
     # model = DistributedDataParallel(model, delay_allreduce=True)
 
     #--------------#-------------#
@@ -390,7 +391,9 @@ def main(opts):
             opts.dataset, opts.task, opts.step))
         # Put the model on GPU
         # model = DistributedDataParallel(model.cuda(device))
-        model = model.cuda(device)
+        # model = model.cuda(device)
+        model = model.to(device)
+        
         ckpt = f"checkpoints/step/{task_name}_{opts.name}_{opts.step}.pth"
         checkpoint = torch.load(ckpt, map_location="cpu")
         model.load_state_dict(checkpoint["model_state"])

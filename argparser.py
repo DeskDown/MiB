@@ -33,7 +33,8 @@ def modify_command_options(opts):
             opts.regularizer = "pi"
             opts.reg_importance = 500
         if opts.method == 'MiB':
-            opts.loss_kd = 10
+            # Set loss_kd high for 15-1 settings
+            opts.loss_kd = 100 if opts.task == '15-5s' else 10
             opts.unce = True
             opts.unkd = True
             opts.init_balanced = True
@@ -202,6 +203,6 @@ def get_argparser():
     parser.add_argument("--col_examplers", action='store_true', default=False,
                         help='create examplers for next step (default: True)')
     parser.add_argument("--use_examplers", action='store_true', default=False,
-                        help='use examplers (default: False)')
+                        help='use_examplers (default: False)')
 
     return parser

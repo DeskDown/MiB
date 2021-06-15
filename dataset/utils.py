@@ -1,5 +1,6 @@
 import torch
 import numpy as np
+from tqdm import tqdm
 
 
 def group_images(dataset, labels):
@@ -7,7 +8,7 @@ def group_images(dataset, labels):
     idxs = {lab: [] for lab in labels}
 
     labels_cum = labels + [0, 255]
-    for i in range(len(dataset)):
+    for i in tqdm(range(len(dataset))):
         cls = np.unique(np.array(dataset[i][1]))
         if all(x in labels_cum for x in cls):
             for x in cls:
@@ -16,15 +17,23 @@ def group_images(dataset, labels):
     return idxs
 
 
-def filter_images(dataset, labels, labels_old=None, overlap=True, opts = None):
+def filter_images(dataset, labels, labels_old=None,
+                  overlap=True, opts=None, col_examplers=False):
     # Filter images without any label in LABELS (using labels not reordered)
+
+    examplers_idxs = None
+    labels_cum = set(([] if labels_old is None else labels_old) + labels)
+    labels_cum.discard(0)
+    labels_cum.discard(255)
+    groups = {lab: [] for lab in labels_cum}
+
+    idxs = []
 
     # use all the data in offline settings
     if opts is not None and opts.task == 'offline':
-        return [i for i in range(len(dataset))]
+        return [i for i in range(len(dataset))], examplers_idxs
 
     # Incremental settings
-    idxs = []
     if 0 in labels:
         labels.remove(0)
 
@@ -34,18 +43,31 @@ def filter_images(dataset, labels, labels_old=None, overlap=True, opts = None):
     labels_cum = labels + labels_old + [0, 255]
 
     if overlap:
-        fil = lambda c: any(x in labels for x in cls)
+        def fil(c): return any(x in labels for x in cls)
     else:
-        fil = lambda c: any(x in labels for x in cls) and all(x in labels_cum for x in c)
+        def fil(c): return any(x in labels for x in cls) and all(
+            x in labels_cum for x in c)
 
-    for i in range(len(dataset)):
-        cls = np.unique(np.array(dataset[i][1]))
+    for i in tqdm(range(len(dataset))):
+        target = np.array(dataset[i][1])
+        cls = np.unique(target)
         if fil(cls):
             idxs.append(i)
-        if i % 1000 == 0:
-            print(f"\t{i}/{len(dataset)} ...")
-    return idxs
+        if col_examplers:
+            update(i, cls, labels_cum, groups)
+    
+    if col_examplers:
+        examplers_idxs = select_examplers(groups, opts.examplers_size)
 
+    return idxs, examplers_idxs
+
+def update(i, cls, labels_cum, groups):
+    for c in cls:
+        if c in labels_cum:
+            groups[c].append(i)
+
+def select_examplers(groups, examplers_size):
+    pass
 
 class Subset(torch.utils.data.Dataset):
     """
@@ -85,6 +107,7 @@ class MaskLabels:
     labels_to_keep (list): The list of labels to keep in the target images
     mask_value (int): The value to replace ignored values (def: 0)
     """
+
     def __init__(self, labels_to_keep, mask_value=0):
         self.labels = labels_to_keep
         self.value = torch.tensor(mask_value, dtype=torch.uint8)
@@ -93,6 +116,7 @@ class MaskLabels:
         # sample must be a tensor
         assert isinstance(sample, torch.Tensor), "Sample must be a tensor"
 
-        sample.apply_(lambda t: t.apply_(lambda x: x if x in self.labels else self.value))
+        sample.apply_(lambda t: t.apply_(
+            lambda x: x if x in self.labels else self.value))
 
         return sample
