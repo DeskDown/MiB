@@ -200,9 +200,11 @@ def get_argparser():
     parser.add_argument("--step_ckpt", default=None, type=str,
                         help="path to trained model at previous step. Leave it None if you want to use def path")
     parser.add_argument('--opt_level', type=str, choices=['O0', 'O1', 'O2', 'O3'], default='O0')
-    parser.add_argument("--col_examplers", action='store_true', default=False,
-                        help='create examplers for next step (default: True)')
-    parser.add_argument("--use_examplers", action='store_true', default=False,
-                        help='use_examplers (default: False)')
+    parser.add_argument("--col_exemplars", action='store_true', default=False,
+                        help='create exemplars for next step (default: True)')
+    parser.add_argument("--use_exemplars", action='store_true', default=False,
+                        help='use the exemplars while training (default: False)')
+    parser.add_argument("--exemplars_size", type=int, default=25,
+                        help='n. of exemplars to store per class (Defautl: 25)')
 
     return parser

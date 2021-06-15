@@ -116,61 +116,65 @@ class VOCSegmentationIncremental(data.Dataset):
 
         full_voc = VOCSegmentation(
             root, 'train' if train else 'val', is_aug=True, transform=None)
-        
+
         idxs = None
         self.labels = []
         self.labels_old = []
-        add_examplers = False
-        col_examplers = False
-        examplers_idxs = None
+        add_exemplars = False
+        col_exemplars = False
+        exemplars_idxs = None
+        new_exemplars_idxs = None
         if labels is not None:
             # store the labels
             labels_old = labels_old if labels_old is not None else []
 
             self.__strip_zero(labels)
             self.__strip_zero(labels_old)
-            if opts.use_examplers == False:
+            if opts.use_exemplars == False:
                 assert not any(l in labels_old for l in labels),\
-                        "labels and labels_old must be disjoint sets"
+                    "labels and labels_old must be disjoint sets"
+
+            # exemplars setup
+            exemplars_path = os.path.join(os.path.dirname(
+                idxs_path), f'exemplars_{opts.step-1}_{opts.exemplars_size}.npy')
+            new_exemplars_path = os.path.join(os.path.dirname(
+                idxs_path), f'exemplars_{opts.step}_{opts.exemplars_size}.npy')
+            if train:
+                if opts.use_exemplars and os.path.exists(exemplars_path):
+                    add_exemplars = True
+                if opts.col_exemplars and not os.path.exists(new_exemplars_path):
+                    col_exemplars = True
+                if opts.step > 0 and opts.use_exemplars:
+                    if os.path.exists(exemplars_path):
+                        exemplars_idxs = np.load(exemplars_path).tolist()
+                    else:
+                        raise f"exemplars not found: {exemplars_path}"
 
 
-            # examplers setup
-            examplers_path = os.path.join(os.path.dirname(
-                idxs_path), f'examplers_{opts.step-1}.npy')
-            new_examplers_path = os.path.join(os.path.dirname(
-                idxs_path), f'examplers_{opts.step}.npy')
-            if train and opts.use_examplers and not os.path.exists(examplers_path):
-                add_examplers = True
-            if train and opts.col_examplers and not os.path.exists(new_examplers_path):
-                col_examplers = True
-            if opts.step > 0 and opts.use_examplers:
-                if os.path.exists(examplers_path):
-                    examplers_idxs = np.load(examplers_path).tolist()
-                else:
-                    raise f"Examplers not found at {examplers_path}"
-
-            # take index of images with at least one class in labels 
-            # and all classes in labels+labels_old+[0,255] 
-            # and take care of examplers 
+            # take index of images with at least one class in labels
+            # and all classes in labels+labels_old+[0,255]
+            # and take care of exemplars
             if idxs_path is not None and os.path.exists(idxs_path):
                 idxs = np.load(idxs_path).tolist()
-            if idxs_path is None or not os.path.exists(idxs_path) or col_examplers:
-                idxs, new_examplers_idxs = filter_images(full_voc, labels, labels_old,
+            if idxs_path is None or not os.path.exists(idxs_path) or col_exemplars:
+                idxs, new_exemplars_idxs = filter_images(full_voc, labels, labels_old,
                                                          overlap=overlap, opts=opts,
-                                                         col_examplers = col_examplers)
-                print(new_examplers_idxs)
+                                                         col_exemplars=col_exemplars)
                 if idxs_path is not None:  # and distributed.get_rank() == 0:
                     np.save(idxs_path, np.array(idxs, dtype=int))
-                if new_examplers_idxs is not None:
-                    np.save(new_examplers_path, np.array(idxs, dtype=int))
-
+                if new_exemplars_idxs is not None:
+                    print("exemplars selected for next steps: {}"
+                            .format(len(new_exemplars_idxs)))
+                    np.save(new_exemplars_path, np.array(idxs, dtype=int))
 
             self.labels = [0] + labels
             self.labels_old = [0] + labels_old
             self.order = [0] + labels_old + labels
 
-            if train and add_examplers:
-                idxs = idxs + examplers_idxs
+            if train and add_exemplars:
+                print("Original train size:{} exemplars to be added:{}"
+                      .format(len(idxs), len(exemplars_idxs)))
+                idxs = idxs + exemplars_idxs
                 self.labels = [0] + labels_old + labels
 
             if train:

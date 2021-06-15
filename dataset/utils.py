@@ -18,20 +18,24 @@ def group_images(dataset, labels):
 
 
 def filter_images(dataset, labels, labels_old=None,
-                  overlap=True, opts=None, col_examplers=False):
+                  overlap=True, opts=None, col_exemplars=False):
     # Filter images without any label in LABELS (using labels not reordered)
 
-    examplers_idxs = None
-    labels_cum = set(([] if labels_old is None else labels_old) + labels)
-    labels_cum.discard(0)
-    labels_cum.discard(255)
-    groups = {lab: [] for lab in labels_cum}
+    # exemplars collection
+    exemplars_idxs = None
+    exampler_labels = set(([] if labels_old is None else labels_old) + labels)
+    exampler_labels.discard(0)
+    exampler_labels.discard(255)
+    groups = {lab: [] for lab in exampler_labels}
+    if col_exemplars:
+        print("exemplars will be collected for following labels.\n{}"
+                .format(exampler_labels))
 
     idxs = []
 
     # use all the data in offline settings
     if opts is not None and opts.task == 'offline':
-        return [i for i in range(len(dataset))], examplers_idxs
+        return [i for i in range(len(dataset))], exemplars_idxs
 
     # Incremental settings
     if 0 in labels:
@@ -53,21 +57,25 @@ def filter_images(dataset, labels, labels_old=None,
         cls = np.unique(target)
         if fil(cls):
             idxs.append(i)
-        if col_examplers:
-            update(i, cls, labels_cum, groups)
+        if col_exemplars:
+            update(i, cls, exampler_labels, groups, opts.exemplars_size)
     
-    if col_examplers:
-        examplers_idxs = select_examplers(groups, opts.examplers_size)
+    if col_exemplars:
+        exemplars_idxs = select_exemplars(groups, opts.exemplars_size)
 
-    return idxs, examplers_idxs
+    return idxs, exemplars_idxs
 
-def update(i, cls, labels_cum, groups):
+
+def update(i, cls, labels_cum, groups, exemplars_size):
     for c in cls:
-        if c in labels_cum:
+        if c in labels_cum and len(groups[c]) < exemplars_size:
             groups[c].append(i)
+            continue
 
-def select_examplers(groups, examplers_size):
-    pass
+
+def select_exemplars(groups, exemplars_size):
+    final_list = [x for g in groups for x in groups[g]]
+    return final_list
 
 class Subset(torch.utils.data.Dataset):
     """
