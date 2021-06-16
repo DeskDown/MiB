@@ -17,7 +17,7 @@ class Trainer:
         self.model = model
         self.device = device
         self.scaler = amp.GradScaler()
-
+        self.batch_size = opts.batch_size
         if classes is not None:
             new_classes = classes[-1]
             tot_classes = reduce(lambda a, b: a + b, classes)
@@ -78,7 +78,7 @@ class Trainer:
         logger.info("Epoch %d, lr = %f" %
                     (cur_epoch, optim.param_groups[0]['lr']))
 
-        pbar = tqdm(total=len(train_loader))
+        pbar = tqdm(total=len(train_loader)*self.batch_size)
         device = self.device
         model = self.model
         criterion = self.criterion
@@ -202,7 +202,7 @@ class Trainer:
 
     def validate(self, loader, metrics, ret_samples_ids=None, logger=None):
         """Do validation and return specified samples"""
-        pbar = tqdm(total=len(loader))
+        pbar = tqdm(total=len(loader)*self.batch_size)
         metrics.reset()
         model = self.model
         device = self.device
