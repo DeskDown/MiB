@@ -136,7 +136,7 @@ class Trainer:
 
             if self.lkd_flag:
                 # resize new output to remove new logits and keep only the old ones
-                lkd = self.lkd * self.lkd_loss(outputs, outputs_old)
+                lkd = self.lkd *16* self.lkd_loss(outputs, outputs_old)
 
             # xxx first backprop of previous loss (compute the gradients for regularization methods)
             loss_tot = loss + lkd + lde + l_icarl

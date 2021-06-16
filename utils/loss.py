@@ -143,6 +143,9 @@ class UnbiasedKnowledgeDistillationLoss(nn.Module):
         self.alpha = alpha
 
     def forward(self, inputs, targets, mask=None):
+        targets = targets/5
+        inputs = inputs/5
+
         new_cl = inputs.shape[1] - targets.shape[1]
 
         targets = targets * self.alpha
