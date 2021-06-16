@@ -143,7 +143,8 @@ class UnbiasedKnowledgeDistillationLoss(nn.Module):
         self.alpha = alpha
 
     def forward(self, inputs, targets, mask=None):
-
+        T = 2 # Distillation temprature
+        inputs = inputs/T
         new_cl = inputs.shape[1] - targets.shape[1]
 
         targets = targets * self.alpha
