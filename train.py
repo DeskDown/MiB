@@ -4,7 +4,7 @@ import torch.nn as nn
 # from apex import amp
 from torch.cuda import amp
 from functools import reduce
-
+from tqdm import tqdm
 from utils.loss import KnowledgeDistillationLoss, BCEWithLogitsLossWithIgnoreIndex, \
     UnbiasedKnowledgeDistillationLoss, UnbiasedCrossEntropy, IcarlLoss
 from utils import get_regularizer
@@ -78,6 +78,7 @@ class Trainer:
         logger.info("Epoch %d, lr = %f" %
                     (cur_epoch, optim.param_groups[0]['lr']))
 
+        pbar = tqdm(total=len(train_loader))
         device = self.device
         model = self.model
         criterion = self.criterion
@@ -178,7 +179,9 @@ class Trainer:
                     x = cur_epoch * len(train_loader) + cur_step + 1
                     logger.add_scalar('Loss', interval_loss, x)
                 interval_loss = 0.0
+            pbar.update(len(labels))
 
+        pbar.close()
         # # collect statistics from multiple processes
         # epoch_loss = torch.tensor(epoch_loss).to(self.device)
         # reg_loss = torch.tensor(reg_loss).to(self.device)
@@ -199,6 +202,7 @@ class Trainer:
 
     def validate(self, loader, metrics, ret_samples_ids=None, logger=None):
         """Do validation and return specified samples"""
+        pbar = tqdm(total=len(loader))
         metrics.reset()
         model = self.model
         device = self.device
@@ -274,6 +278,9 @@ class Trainer:
                     ret_samples.append((images[0].detach().cpu().numpy(),
                                         labels[0],
                                         prediction[0]))
+                pbar.update(len(labels))
+            
+            pbar.close()
 
             # # collect statistics from multiple processes #Why
             # metrics.synch(device)
