@@ -174,7 +174,7 @@ class VOCSegmentationIncremental(data.Dataset):
             if train and add_exemplars:
                 print("Original train size:{} exemplars to be added:{}"
                       .format(len(idxs), len(exemplars_idxs)))
-                idxs = idxs + exemplars_idxs
+                idxs = idxs + exemplars_idxs*10
                 self.labels = [0] + labels_old + labels
 
             if train:
