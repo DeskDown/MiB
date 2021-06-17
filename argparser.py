@@ -121,10 +121,10 @@ def get_argparser():
                         help="visualization on tensorboard (def: Yes)")
     parser.add_argument("--print_interval", type=int, default=100,
                         help="print interval of loss (default: 10)")
-    parser.add_argument("--val_interval", type=int, default=2,
-                        help="epoch interval for eval (default: 1)")
-    parser.add_argument("--ckpt_interval", type=int, default=1,
-                        help="epoch interval for saving model (default: 1)")
+    parser.add_argument("--val_interval", type=int, default=5,
+                        help="epoch interval for eval (default: 5)")
+    parser.add_argument("--ckpt_interval", type=int, default=5,
+                        help="epoch interval for saving model (default: 5)")
 
     # Model Options
     parser.add_argument("--backbone", type=str, default='resnet50',
