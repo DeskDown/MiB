@@ -147,6 +147,7 @@ class VOCSegmentationIncremental(data.Dataset):
                 if opts.step > 0 and opts.use_exemplars:
                     if os.path.exists(exemplars_path):
                         exemplars_idxs = np.load(exemplars_path).tolist()
+                        print("{} exemplars loaded from {}".format(len(exemplars_idxs), exemplars_path))
                     else:
                         raise f"exemplars not found: {exemplars_path}"
 
@@ -156,6 +157,7 @@ class VOCSegmentationIncremental(data.Dataset):
             # and take care of exemplars
             if idxs_path is not None and os.path.exists(idxs_path):
                 idxs = np.load(idxs_path).tolist()
+                print("{} indexes loaded from {}".format(len(idxs_path), idxs_path))
             if idxs_path is None or not os.path.exists(idxs_path) or col_exemplars:
                 idxs, new_exemplars_idxs = filter_images(full_voc, labels, labels_old,
                                                          overlap=overlap, opts=opts,
