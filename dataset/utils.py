@@ -1,6 +1,6 @@
 import torch
 import numpy as np
-from tqdm import tqdm
+from tqdm import trange
 
 
 def group_images(dataset, labels):
@@ -8,7 +8,7 @@ def group_images(dataset, labels):
     idxs = {lab: [] for lab in labels}
 
     labels_cum = labels + [0, 255]
-    for i in tqdm(range(len(dataset))):
+    for i in trange(len(dataset)):
         cls = np.unique(np.array(dataset[i][1]))
         if all(x in labels_cum for x in cls):
             for x in cls:
@@ -52,7 +52,7 @@ def filter_images(dataset, labels, labels_old=None,
         def fil(c): return any(x in labels for x in cls) and all(
             x in labels_cum for x in c)
 
-    for i in tqdm(range(len(dataset))):
+    for i in trange(len(dataset)):
         target = np.array(dataset[i][1])
         cls = np.unique(target)
         if fil(cls):
@@ -82,16 +82,22 @@ class Subset(torch.utils.data.Dataset):
     Subset of a dataset at specified indices.
     Arguments:
         dataset (Dataset): The whole Dataset
-        indices (sequence): Indices in the whole set selected for subset
+        indices (sequence): Indices of new classes in the whole set selected for subset
+        ex_indices (sequence): Indices of exemplars
         transform (callable): way to transform the images and the targets
         target_transform(callable): way to transform the target labels
+        exemplars_transform (callable): mask new classes from exemplars
     """
 
-    def __init__(self, dataset, indices, transform=None, target_transform=None):
+    def __init__(self, dataset, indices, ex_indices, transform=None, target_transform=None, exemplars_transform = None):
         self.dataset = dataset
-        self.indices = indices
+        self.indices = indices + ex_indices if ex_indices is not None else indices
+        self.new_classes_idxs = set(indices)
+        self.exemplars_idxs = set(ex_indices)
         self.transform = transform
         self.target_transform = target_transform
+        self.exemplars_transform = exemplars_transform
+
 
     def __getitem__(self, idx):
         sample, target = self.dataset[self.indices[idx]]
@@ -99,9 +105,13 @@ class Subset(torch.utils.data.Dataset):
         if self.transform is not None:
             sample, target = self.transform(sample, target)
 
+        # Remove future labels from target
         if self.target_transform is not None:
             target = self.target_transform(target)
-
+        
+        # Mask new classes labels from exemplars
+        if exemplars_transform is not None and idx not in self.new_classes_idxs:
+            target = self.target_transform(target)
         return sample, target
 
     def __len__(self):

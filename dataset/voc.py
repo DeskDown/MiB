@@ -176,7 +176,8 @@ class VOCSegmentationIncremental(data.Dataset):
             if train and add_exemplars:
                 print("Original train size:{} exemplars to be added:{}"
                       .format(len(idxs), len(exemplars_idxs)))
-                idxs = idxs + exemplars_idxs
+                # idxs = idxs + exemplars_idxs
+                # concatination of idxs is moved inside Subset Class
                 self.labels = [0] + labels_old + labels
 
             if train:
@@ -187,19 +188,25 @@ class VOCSegmentationIncremental(data.Dataset):
             self.inverted_order = {label: self.order.index(
                 label) for label in self.order}
             self.inverted_order[255] = masking_value
-
+            exemplars_transform = None
+            target_transform = None
             reorder_transform = tv.transforms.Lambda(
                 lambda t: t.apply_(lambda x: self.inverted_order[x] if x in self.inverted_order else masking_value))
 
             if masking:
-                tmp_labels = self.labels + [255]
+                tmp_labels = set(self.labels + [255])
                 target_transform = tv.transforms.Lambda(
                     lambda t: t.apply_(lambda x: self.inverted_order[x] if x in tmp_labels else masking_value))
             else:
                 target_transform = reorder_transform
 
+            if train and add_exemplars:
+                allowed_labels = set(labels_old)
+                exemplars_transform = tv.transforms.Lambda(
+                    lambda t: t.apply_(lambda x: self.inverted_order[x] if x in allowed_labels else masking_value))
+
             # make the subset of the dataset
-            self.dataset = Subset(full_voc, idxs, transform, target_transform)
+            self.dataset = Subset(full_voc, idxs, exemplars_idxs, transform, target_transform, exemplars_transform)
         else:
             self.dataset = full_voc
 
