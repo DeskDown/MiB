@@ -157,7 +157,7 @@ class VOCSegmentationIncremental(data.Dataset):
             # and take care of exemplars
             if idxs_path is not None and os.path.exists(idxs_path):
                 idxs = np.load(idxs_path).tolist()
-                print("{} indexes loaded from {}".format(len(idxs_path), idxs_path))
+                print("{} indexes loaded from {}".format(len(idxs), idxs_path))
             if idxs_path is None or not os.path.exists(idxs_path) or col_exemplars:
                 idxs, new_exemplars_idxs = filter_images(full_voc, labels, labels_old,
                                                          overlap=overlap, opts=opts,
@@ -178,7 +178,7 @@ class VOCSegmentationIncremental(data.Dataset):
                       .format(len(idxs), len(exemplars_idxs)))
                 # idxs = idxs + exemplars_idxs
                 # concatination of idxs is moved inside Subset Class
-                
+
                 self.labels = [0] + labels_old + labels # allow old labels in training for new classes
 
             if train:

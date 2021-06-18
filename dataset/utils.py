@@ -70,7 +70,7 @@ def update(i, cls, labels_cum, groups, exemplars_size):
     for c in cls:
         if c in labels_cum and len(groups[c]) < exemplars_size:
             groups[c].append(i)
-            continue
+            return
 
 
 def select_exemplars(groups, exemplars_size):
@@ -91,13 +91,18 @@ class Subset(torch.utils.data.Dataset):
 
     def __init__(self, dataset, indices, ex_indices, transform=None, target_transform=None, exemplars_transform = None):
         self.dataset = dataset
-        self.indices = indices + ex_indices if ex_indices is not None else indices
+        idxs = indices + ex_indices if ex_indices is not None else indices
+        np.random.shuffle(idxs)
+        self.indices = idxs # indices + ex_indices if ex_indices is not None else indices
         self.new_classes_idxs = set(indices)
         self.exemplars_idxs = set(ex_indices) if ex_indices is not None else set()
         self.transform = transform
         self.target_transform = target_transform
         self.exemplars_transform = exemplars_transform
-        print(indices, ex_indices)
+        # print("new classes", self.new_classes_idxs, 
+        #     "exemplars", self.exemplars_idxs, 
+        #     "intersection", self.exemplars_idxs.intersection(self.new_classes_idxs), sep = '\n')
+        
 
     def __getitem__(self, idx):
         sample, target = self.dataset[self.indices[idx]]
@@ -112,7 +117,7 @@ class Subset(torch.utils.data.Dataset):
         # Mask new classes labels from exemplars
         if self._applyExemplarsMask(idx):
             target = self.exemplars_transform(target)
-            print(f"{self.indices[idx]} is an exemplar")
+            # print(f"{self.indices[idx]} is an exemplar")
         return sample, target
 
     def __len__(self):
