@@ -38,7 +38,7 @@ class Trainer:
         else:
             self.criterion = nn.CrossEntropyLoss(
                 ignore_index=255, reduction=reduction)
-
+        print("Using {} as CE loss function.".format(self.criterion))
         # ILTSS
         self.lde = opts.loss_de
         self.lde_flag = self.lde > 0. and model_old is not None
