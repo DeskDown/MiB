@@ -57,7 +57,7 @@ def get_argparser():
                         help='number of workers (default: 1)')
 
     # Datset Options
-    parser.add_argument("--data_root", type=str, default= "/root_drive/MyDrive/data" 
+    parser.add_argument("--data_root", type=str, default= "/content/root_drive/MyDrive/data" 
         if os.name != 'nt' else r"C:\Users\rehma\Google Drive\data",
                         help="path to Dataset")
     parser.add_argument("--dataset", type=str, default='voc',
