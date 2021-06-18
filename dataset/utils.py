@@ -97,7 +97,7 @@ class Subset(torch.utils.data.Dataset):
         self.transform = transform
         self.target_transform = target_transform
         self.exemplars_transform = exemplars_transform
-
+        print(indices, ex_indices)
 
     def __getitem__(self, idx):
         sample, target = self.dataset[self.indices[idx]]
@@ -110,12 +110,19 @@ class Subset(torch.utils.data.Dataset):
             target = self.target_transform(target)
         
         # Mask new classes labels from exemplars
-        if self.exemplars_transform is not None and idx not in self.new_classes_idxs:
+        if self._applyExemplarsMask(idx):
             target = self.exemplars_transform(target)
+            print(f"{idx} is an exemplar")
         return sample, target
 
     def __len__(self):
         return len(self.indices)
+
+
+    def _applyExemplarsMask(self, idx):
+        # This mask is applied to remove labels of new classes from exemplars
+        # Exemplars can only contain labels for previously learned classes
+        return self.exemplars_transform is not None and self.indices[idx] not in self.new_classes_idxs
 
 
 class MaskLabels:
