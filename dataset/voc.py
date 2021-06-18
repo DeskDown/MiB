@@ -178,7 +178,8 @@ class VOCSegmentationIncremental(data.Dataset):
                       .format(len(idxs), len(exemplars_idxs)))
                 # idxs = idxs + exemplars_idxs
                 # concatination of idxs is moved inside Subset Class
-                self.labels = [0] + labels_old + labels
+                
+                self.labels = [0] + labels_old + labels # allow old labels in training for new classes
 
             if train:
                 masking_value = 0

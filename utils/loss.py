@@ -143,6 +143,15 @@ class UnbiasedKnowledgeDistillationLoss(nn.Module):
         self.alpha = alpha
 
     def forward(self, inputs, targets, mask=None):
+        """
+        Args:
+            inputs (sequence): outputs of current model
+            targets (sequence): outputs of old model
+            mask (bool, optional): Defaults to None.
+
+        Returns:
+            tensor: Unbiased KDloss
+        """
         new_cl = inputs.shape[1] - targets.shape[1]
 
         targets = targets * self.alpha

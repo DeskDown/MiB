@@ -111,7 +111,7 @@ class Subset(torch.utils.data.Dataset):
         
         # Mask new classes labels from exemplars
         if exemplars_transform is not None and idx not in self.new_classes_idxs:
-            target = self.target_transform(target)
+            target = self.exemplars_transform(target)
         return sample, target
 
     def __len__(self):
