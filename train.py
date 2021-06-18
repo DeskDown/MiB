@@ -19,9 +19,9 @@ class Trainer:
         self.scaler = amp.GradScaler()
         self.batch_size = opts.batch_size
         if classes is not None:
-            new_classes = classes[-1]
-            tot_classes = reduce(lambda a, b: a + b, classes)
-            self.old_classes = tot_classes - new_classes
+            new_classes = classes[-1] # n. of new classes to be learned
+            tot_classes = reduce(lambda a, b: a + b, classes) # n. of classes learned including this step
+            self.old_classes = tot_classes - new_classes # n. of classes previous model is trained upon
         else:
             self.old_classes = 0
 

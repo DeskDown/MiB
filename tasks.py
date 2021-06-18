@@ -159,3 +159,8 @@ def get_per_task_classes(dataset, name, step):
 
     classes = [len(task_dict[s]) for s in range(step+1)]
     return classes
+
+
+
+if __name__ == '__main__':
+    print(get_per_task_classes('voc', '15-5s', 3))

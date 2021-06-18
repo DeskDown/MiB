@@ -35,7 +35,7 @@ def modify_command_options(opts):
         if opts.method == 'MiB':
             # Set loss_kd high for 15-1 settings
             opts.loss_kd = 100 if opts.task == '15-5s' else 10
-            opts.unce = True
+            opts.unce = False if opts.use_exemplars else True
             opts.unkd = True
             opts.init_balanced = True
 
