@@ -115,9 +115,9 @@ class Subset(torch.utils.data.Dataset):
             target = self.target_transform(target)
         
         # Mask new classes labels from exemplars
-        if self._applyExemplarsMask(idx):
-            target = self.exemplars_transform(target)
-            # print(f"{self.indices[idx]} is an exemplar")
+        # if self._applyExemplarsMask(idx):
+        #     target = self.exemplars_transform(target)
+        #     # print(f"{self.indices[idx]} is an exemplar")
         return sample, target
 
     def __len__(self):
