@@ -147,14 +147,14 @@ class VOCSegmentationIncremental(data.Dataset):
                 if opts.step > 0 and opts.use_exemplars:
                     if os.path.exists(exemplars_path):
                         exemplars_idxs = np.load(exemplars_path).tolist()
-                        print("{} exemplars loaded from {}".format(len(exemplars_idxs), exemplars_path))
+                        print("{} exemplars loaded from {}".format(
+                            len(exemplars_idxs), exemplars_path))
                     else:
                         raise f"exemplars not found: {exemplars_path}"
 
-
             # take index of images with at least one class in labels
             # and all classes in labels+labels_old+[0,255]
-            # and take care of exemplars
+            # and create indices of exemplars if needed
             if idxs_path is not None and os.path.exists(idxs_path):
                 idxs = np.load(idxs_path).tolist()
                 print("{} indexes loaded from {}".format(len(idxs), idxs_path))
@@ -162,12 +162,13 @@ class VOCSegmentationIncremental(data.Dataset):
                 idxs, new_exemplars_idxs = filter_images(full_voc, labels, labels_old,
                                                          overlap=overlap, opts=opts,
                                                          col_exemplars=col_exemplars)
-                if idxs_path is not None:  # and distributed.get_rank() == 0:
+                if idxs_path is not None:
                     np.save(idxs_path, np.array(idxs, dtype=int))
                 if new_exemplars_idxs is not None:
                     print("exemplars selected for next steps: {}"
-                            .format(len(new_exemplars_idxs)))
-                    np.save(new_exemplars_path, np.array(new_exemplars_idxs, dtype=int))
+                          .format(len(new_exemplars_idxs)))
+                    np.save(new_exemplars_path, np.array(
+                        new_exemplars_idxs, dtype=int))
 
             self.labels = [0] + labels
             self.labels_old = [0] + labels_old
@@ -176,10 +177,11 @@ class VOCSegmentationIncremental(data.Dataset):
             if train and add_exemplars:
                 print("Original train size:{} exemplars to be added:{}"
                       .format(len(idxs), len(exemplars_idxs)))
-                # idxs = idxs + exemplars_idxs
-                # concatination of idxs is moved inside Subset Class
-
-                self.labels = [0] + labels_old + labels # allow old labels in training for new classes
+                # exemplars with labels of new classes are
+                # used as new class training samples
+                idxs = np.unique(idxs + exemplars_idxs).tolist()
+                # allow old labels in training for new classes
+                self.labels = [0] + labels_old + labels
 
             if train:
                 masking_value = 0
@@ -201,13 +203,13 @@ class VOCSegmentationIncremental(data.Dataset):
             else:
                 target_transform = reorder_transform
 
-            if train and add_exemplars:
-                allowed_labels = set(labels_old)
-                exemplars_transform = tv.transforms.Lambda(
-                    lambda t: t.apply_(lambda x: self.inverted_order[x] if x in allowed_labels else masking_value))
+            # if train and add_exemplars:
+            #     allowed_labels = set(labels_old)
+            #     exemplars_transform = tv.transforms.Lambda(
+            #         lambda t: t.apply_(lambda x: self.inverted_order[x] if x in allowed_labels else masking_value))
 
             # make the subset of the dataset
-            self.dataset = Subset(full_voc, idxs, exemplars_idxs, transform, target_transform, exemplars_transform)
+            self.dataset = Subset(full_voc, idxs, transform, target_transform)
         else:
             self.dataset = full_voc
 

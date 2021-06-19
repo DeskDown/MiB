@@ -89,16 +89,16 @@ class Subset(torch.utils.data.Dataset):
         exemplars_transform (callable): mask new classes from exemplars
     """
 
-    def __init__(self, dataset, indices, ex_indices, transform=None, target_transform=None, exemplars_transform = None):
+    def __init__(self, dataset, indices, ex_indices = None, 
+                transform=None, target_transform=None, exemplars_transform = None):
         self.dataset = dataset
-        idxs = indices + ex_indices if ex_indices is not None else indices
-        np.random.shuffle(idxs)
-        self.indices = idxs # indices + ex_indices if ex_indices is not None else indices
-        self.new_classes_idxs = set(indices)
-        self.exemplars_idxs = set(ex_indices) if ex_indices is not None else set()
+        np.random.shuffle(indices)
+        self.indices = indices # indices + ex_indices if ex_indices is not None else indices
+        # self.new_classes_idxs = set(indices)
+        # self.exemplars_idxs = set(ex_indices) if ex_indices is not None else set()
         self.transform = transform
         self.target_transform = target_transform
-        self.exemplars_transform = exemplars_transform
+        # self.exemplars_transform = exemplars_transform
         # print("new classes", self.new_classes_idxs, 
         #     "exemplars", self.exemplars_idxs, 
         #     "intersection", self.exemplars_idxs.intersection(self.new_classes_idxs), sep = '\n')
@@ -124,10 +124,10 @@ class Subset(torch.utils.data.Dataset):
         return len(self.indices)
 
 
-    def _applyExemplarsMask(self, idx):
-        # This mask is applied to remove labels of new classes from exemplars
-        # Exemplars can only contain labels for previously learned classes
-        return self.exemplars_transform is not None and self.indices[idx] not in self.new_classes_idxs
+    # def _applyExemplarsMask(self, idx):
+    #     # This mask is applied to remove labels of new classes from exemplars
+    #     # Exemplars can only contain labels for previously learned classes
+    #     return self.exemplars_transform is not None and self.indices[idx] not in self.new_classes_idxs
 
 
 class MaskLabels:
