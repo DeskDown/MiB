@@ -68,13 +68,23 @@ def filter_images(dataset, labels, labels_old=None,
 
 def update(i, cls, labels_cum, groups, exemplars_size):
     for c in cls:
-        if c in labels_cum and len(groups[c]) < exemplars_size:
+        if c in labels_cum and len(groups[c]) < 3*exemplars_size:
             groups[c].append(i)
+            # An exemplar can represent only 1 class
             return
 
+def random_update(i, cls, labels_cum, groups, exemplars_size):
+    while True:
+        # select one class randomly
+        c = np.random.choice(cls, size = 1)[0]
+        # We collect 3x size of exemplars
+        if c in labels_cum and len(groups[c]) < 3*exemplars_size:
+            groups[c].append(i)
+            # An exemplar can represent only 1 class
+            return
 
 def select_exemplars(groups, exemplars_size):
-    final_list = [x for g in groups for x in groups[g]]
+    final_list = [x for g in groups for x in np.random.choice(groups[g], exemplars_size, False) ]
     return final_list
 
 class Subset(torch.utils.data.Dataset):
