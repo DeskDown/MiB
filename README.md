@@ -21,7 +21,8 @@ We modify the MiB protocol and allow a fixed number of exemplars per class to be
 
 Incremental setup using SMiB protocol:
 
-![exemplars](./exemplars.png)
+<img src="./Exemplars.png" width="200"/>
+
 
 # Results and Conclusions
 
