@@ -19,9 +19,11 @@ class Trainer:
         self.scaler = amp.GradScaler()
         self.batch_size = opts.batch_size
         if classes is not None:
-            new_classes = classes[-1] # n. of new classes to be learned
-            tot_classes = reduce(lambda a, b: a + b, classes) # n. of classes learned including this step
-            self.old_classes = tot_classes - new_classes # n. of classes previous model is trained upon
+            new_classes = classes[-1]  # n. of new classes to be learned
+            # n. of classes learned including this step
+            tot_classes = reduce(lambda a, b: a + b, classes)
+            # n. of classes previous model is trained upon
+            self.old_classes = tot_classes - new_classes
         else:
             self.old_classes = 0
 
@@ -78,7 +80,7 @@ class Trainer:
         logger.info("Epoch %d, lr = %f" %
                     (cur_epoch, optim.param_groups[0]['lr']))
 
-        pbar = tqdm(total=len(train_loader)*self.batch_size)
+        pbar = tqdm(total=len(train_loader) * self.batch_size)
         device = self.device
         model = self.model
         criterion = self.criterion
@@ -146,14 +148,14 @@ class Trainer:
             #     scaled_loss.backward()
 
             # xxx Regularizer (EWC, RW, PI) # What?
-            if self.regularizer_flag:
-                # if distributed.get_rank() == 0:
-                self.regularizer.update()
-                l_reg = self.reg_importance * self.regularizer.penalty()
-                if l_reg != 0.:
-                    # with amp.scale_loss(l_reg, optim) as scaled_loss:
-                    #     scaled_loss.backward()
-                    self.scaler.scale(l_reg).backward()
+            # if self.regularizer_flag:
+            #     # if distributed.get_rank() == 0:
+            #     self.regularizer.update()
+            #     l_reg = self.reg_importance * self.regularizer.penalty()
+            #     if l_reg != 0.:
+            #         # with amp.scale_loss(l_reg, optim) as scaled_loss:
+            #         #     scaled_loss.backward()
+            #         self.scaler.scale(l_reg).backward()
 
             # optim.step()
             self.scaler.step(optim)
@@ -202,7 +204,7 @@ class Trainer:
 
     def validate(self, loader, metrics, ret_samples_ids=None, logger=None):
         """Do validation and return specified samples"""
-        pbar = tqdm(total=len(loader)*self.batch_size)
+        pbar = tqdm(total=len(loader) * self.batch_size)
         metrics.reset()
         model = self.model
         device = self.device
@@ -279,7 +281,7 @@ class Trainer:
                                         labels[0],
                                         prediction[0]))
                 pbar.update(len(labels))
-            
+
             pbar.close()
 
             # # collect statistics from multiple processes #Why

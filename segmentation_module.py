@@ -106,7 +106,6 @@ class IncrementalBiseNet(nn.Module):
         #     return x_o, x_b,  x_pl
         return x_o, out_cx1, out_cx2
 
-
     def init_new_classifier(self, device):
         # Update the Final classifier
         cls = self.cls[-1]
@@ -118,6 +117,7 @@ class IncrementalBiseNet(nn.Module):
         cls.weight.data.copy_(imprinting_w)
         cls.bias.data.copy_(new_bias)
         self.cls[0].bias[0].data.copy_(new_bias.squeeze(0))
+
         # Update the aux. output 1
         sv1 = self.sv1[-1]
         imprinting_w = self.sv1[0].weight[0]
@@ -128,6 +128,7 @@ class IncrementalBiseNet(nn.Module):
         sv1.weight.data.copy_(imprinting_w)
         sv1.bias.data.copy_(new_bias)
         self.sv1[0].bias[0].data.copy_(new_bias.squeeze(0))
+
         # Update the aux. output 2
         sv2 = self.sv2[-1]
         imprinting_w = self.sv2[0].weight[0]
@@ -138,7 +139,6 @@ class IncrementalBiseNet(nn.Module):
         sv2.weight.data.copy_(imprinting_w)
         sv2.bias.data.copy_(new_bias)
         self.sv2[0].bias[0].data.copy_(new_bias.squeeze(0))
-
 
     def forward(self, x, scales=None, do_flip=False, ret_intermediate=False):
         out_size = x.shape[-2:]
