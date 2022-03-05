@@ -30,7 +30,7 @@ Results are shown using The mean intersection over union (mIoU) score as evaluat
 
 ![results](./results.png)
 
-<img src="./SMiB_bars.png" width="500" height="1200"/>
+<img src="./SMiB_bars.png" width="500" height="1200" alt="Exemplars effect on models performance for 15-5 (top) and 15-5s (bottom) tasks."/>
 
 <br>
 
