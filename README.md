@@ -32,13 +32,9 @@ Results are shown using The mean intersection over union (mIoU) score as evaluat
 
 <img src="./SMiB_bars.png" width="500" height="1200"/>
 
-<figure>
-  <img src="./SMiB_bars.png" width="500" height="1200">
-  <figcaption>Exemplars effect on models performance for 15-5 (top) and 15-5s (bottom) tasks.</figcaption>
-</figure>
 <br>
 
-Exemplars effect on models performance for 15-5 (top) and 15-5s (bottom) tasks.
+*Exemplars effect on models performance for 15-5 (top) and 15-5s (bottom) tasks.*
 
 Rehearsal based methods outperform other non-rehearsal techniques even when stored samples are very few.
 Pixel-level annotations in semantic segmentation helps the model to retain the previous knowledge using very few exemplars.
